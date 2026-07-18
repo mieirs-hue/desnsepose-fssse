@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/settings.json

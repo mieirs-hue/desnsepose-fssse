@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SENTRY MATRIX // 3D SPATIAL TRACKER</title>
+  <style>
+    :root {
+      --bg-0: #06090e;
+      --bg-1: #0b1420;
+      --ink: #9bc8ff;
+      --mint: #00ffcc;
+      --cyan: #00aaff;
+      --warn: #ff3366;
+      --hud-bg: rgba(10, 16, 26, 0.86);
+      --hud-border: rgba(0, 255, 204, 0.4);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 20%, #12263a 0%, transparent 35%),
+        radial-gradient(circle at 80% 30%, #0a1d2b 0%, transparent 35%),
+        linear-gradient(160deg, var(--bg-0), var(--bg-1));
+      color: var(--ink);
+      font-family: "Consolas", "Lucida Console", monospace;
+    }
+
+    .metric {
+      margin: 5px 0;
+      font-size: 12px;
+      color: var(--ink);
+    }
+
+    .highlight {
+      color: var(--mint);
+      font-weight: 700;
+    }
+
+    .alert-active {
+      color: var(--warn);
+      animation: pulse 1s infinite;
+    }
+
+    #status-badge {
+      color: #d2e6ff;
+      opacity: 0.9;
+    }
+
+    #view-controls {
+      position: absolute;
+      top: 12px;
+      right: 18px;
+      z-index: 11;
+      width: min(380px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      background: rgba(10, 16, 26, 0.84);
+      border: 1px solid rgba(0, 170, 255, 0.45);
+      border-radius: 8px;
+      box-shadow: 0 0 18px rgba(0, 170, 255, 0.2);
+      padding: 12px;
+      backdrop-filter: blur(4px);
+    }
+
+    #view-controls h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      color: #7ad3ff;
+      font-weight: 700;
+    }
+
+    #panel-rule {
+      margin: 8px 0;
+      border: 0;
+      border-top: 1px solid rgba(122, 211, 255, 0.3);
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .view-btn {
+      border: 1px solid rgba(122, 211, 255, 0.55);
+      background: rgba(8, 20, 32, 0.9);
+      color: #b9e5ff;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: "Consolas", "Lucida Console", monospace;
+    }
+
+    .view-btn.active {
+      border-color: rgba(0, 255, 204, 0.9);
+      color: #00ffcc;
+      box-shadow: 0 0 10px rgba(0, 255, 204, 0.25);
+    }
+
+    #go-hide-toggle {
+      border: 1px solid rgba(0, 255, 204, 0.7);
+      background: rgba(6, 24, 20, 0.95);
+      color: #d2fff5;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: "Consolas", "Lucida Console", monospace;
+    }
+
+    #go-hide-toggle.paused {
+      border-color: rgba(255, 51, 102, 0.75);
+      background: rgba(38, 10, 18, 0.95);
+      color: #ffd7e3;
+    }
+
+    #run-led {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 7px;
+      box-shadow: 0 0 9px rgba(0, 255, 120, 0.6);
+      background: #00ff78;
+      vertical-align: middle;
+    }
+
+    #run-led.paused {
+      background: #ff365d;
+      box-shadow: 0 0 9px rgba(255, 54, 93, 0.65);
+    }
+
+    #mission-reminder {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      z-index: 12;
+      background: rgba(7, 20, 34, 0.92);
+      border: 1px solid rgba(0, 255, 204, 0.5);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #d2f4ff;
+      font-size: 12px;
+      display: none;
+      box-shadow: 0 0 16px rgba(0, 170, 255, 0.22);
+    }
+
+    #mission-reminder.show {
+      display: block;
+      animation: pulse 1s linear 4;
+    }
+
+    .zoom-wrap {
+      display: grid;
+      gap: 6px;
+    }
+
+    #zoom-slider {
+      width: 100%;
+      accent-color: #00ffcc;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: 11px;
+      opacity: 0.8;
+      color: #9bc8ff;
+    }
+
+    canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.35; }
+      50% { opacity: 1; }
+      100% { opacity: 0.35; }
+    }
+  </style>
+</head>
+<body>
+  <div id="view-controls">
+    <h3>VIEW CONTROL + LIVE DATA</h3>
+    <div class="btn-row">
+      <button id="go-hide-toggle" type="button"><span id="run-led"></span><span id="go-hide-label">GO GO HIDE: RUNNING</span></button>
+    </div>
+    <div class="btn-row">
+      <button id="view-iso" class="view-btn active" type="button">30 DEG ANGLE</button>
+      <button id="view-top" class="view-btn" type="button">TOPSIDE</button>
+    </div>
+    <div class="zoom-wrap">
+      <label for="zoom-slider" class="hint">ZOOM (mouse wheel also works)</label>
+      <input id="zoom-slider" type="range" min="14" max="56" step="1" value="28" />
+      <p class="hint">Tip: shift view/zoom while you walk for calibration.</p>
+    </div>
+    <hr id="panel-rule" />
+    <div class="metric">NODE A (COM5, SOUTHEAST): <span id="dbm-a" class="highlight">-80.0 dBm</span></div>
+    <div class="metric">NODE B (COM10, NORTHWEST): <span id="dbm-b" class="highlight">-80.0 dBm</span></div>
+    <div class="metric">TARGET COORDS: <span id="target-xyz" class="highlight">[10.0, 5.0, 0.0]</span></div>
+    <div class="metric">ACTIVE LEVEL: <span id="floor-status" class="highlight">INITIALIZING</span></div>
+    <div class="metric">MOTION STATE: <span id="motion-state" class="highlight">CALIBRATING</span></div>
+    <div class="metric">FLOOR-1 ZONE: <span id="floor1-zone" class="highlight">UNKNOWN</span></div>
+    <div class="metric">TRACKING GOAL: <span id="goal-text" class="highlight">FIND A PERSON USING ESP32-S3 A/B</span></div>
+    <div class="metric">ROOM: <span id="room-scale" class="highlight">20ft x 10ft x 18ft</span></div>
+    <div class="metric">RF DIAMETER: <span id="rf-diameter" class="highlight">40ft</span></div>
+    <div class="metric">DISPLAY SCALE: <span id="display-scale" class="highlight">28 px/ft</span></div>
+    <div id="status-badge" class="metric">PIPELINE STATUS: CONNECTING</div>
+  </div>
+
+  <div id="mission-reminder"></div>
+
+  <canvas id="matrixCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("matrixCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const dbmAEl = document.getElementById("dbm-a");
+    const dbmBEl = document.getElementById("dbm-b");
+    const targetEl = document.getElementById("target-xyz");
+    const floorEl = document.getElementById("floor-status");
+    const motionEl = document.getElementById("motion-state");
+    const floor1ZoneEl = document.getElementById("floor1-zone");
+    const roomScaleEl = document.getElementById("room-scale");
+    const rfDiameterEl = document.getElementById("rf-diameter");
+    const displayScaleEl = document.getElementById("display-scale");
+    const statusEl = document.getElementById("status-badge");
+    const zoomSlider = document.getElementById("zoom-slider");
+    const viewIsoBtn = document.getElementById("view-iso");
+    const viewTopBtn = document.getElementById("view-top");
+    const goHideToggleBtn = document.getElementById("go-hide-toggle");
+    const runLedEl = document.getElementById("run-led");
+    const goHideLabelEl = document.getElementById("go-hide-label");
+    const missionReminderEl = document.getElementById("mission-reminder");
+
+    const ROOM = { width: 20, depth: 10, height: 18 };
+    const RF_RADIUS_FT = 20;
+    let feetToPx = 28;
+    const nodeA = { x: ROOM.width, y: ROOM.depth, z: 9 };
+    const nodeB = { x: 0, y: 0, z: 9 };
+    let cameraMode = "iso30";
+    let trackingEnabled = true;
+    let reminderTimer = null;
+
+    let originX = 0;
+    let originY = 0;
+
+    let target = { x: 10, y: 5, z: 0 };
+    let liveData = { node_a: -80, node_b: -80 };
+    let lastTarget = null;
+    let lastTimestamp = null;
+    let motionSpeedFps = 0;
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      originX = canvas.width / 2;
+      originY = canvas.height / 1.35;
+
+      roomScaleEl.textContent = `${ROOM.width}ft x ${ROOM.depth}ft x ${ROOM.height}ft`;
+      rfDiameterEl.textContent = `${RF_RADIUS_FT * 2}ft`;
+      displayScaleEl.textContent = `${feetToPx} px/ft`;
+    }
+
+    function setCameraMode(mode) {
+      cameraMode = mode;
+      viewIsoBtn.classList.toggle("active", mode === "iso30");
+      viewTopBtn.classList.toggle("active", mode === "top");
+    }
+
+    function showMissionReminder() {
+      missionReminderEl.textContent = "MISSION: Find a person in the first-floor office via ESP32-S3 A/B RF telemetry. Room: 20ft wide x 10ft deep x 18ft high. Sphere radius: 20ft (40ft diameter). A=SE near ceiling, B=NW near ceiling.";
+      missionReminderEl.classList.add("show");
+      clearTimeout(reminderTimer);
+      reminderTimer = setTimeout(() => {
+        missionReminderEl.classList.remove("show");
+      }, 4000);
+    }
+
+    function setTrackingEnabled(enabled) {
+      trackingEnabled = enabled;
+
+      if (enabled) {
+        goHideToggleBtn.classList.remove("paused");
+        runLedEl.classList.remove("paused");
+        goHideLabelEl.textContent = "GO GO HIDE: RUNNING";
+        statusEl.textContent = "PIPELINE STATUS: STREAM ACTIVE";
+        showMissionReminder();
+      } else {
+        goHideToggleBtn.classList.add("paused");
+        runLedEl.classList.add("paused");
+        goHideLabelEl.textContent = "GO GO HIDE: STOPPED";
+        statusEl.textContent = "PIPELINE STATUS: PAUSED BY OPERATOR";
+      }
+    }
+
+    function clampTarget() {
+      target.x = Math.max(0, Math.min(ROOM.width, target.x));
+      target.y = Math.max(0, Math.min(ROOM.depth, target.y));
+      target.z = Math.max(0, Math.min(ROOM.height, target.z));
+    }
+
+    function describeFloor1Zone() {
+      if (target.z > 9) {
+        return "ABOVE FLOOR 1";
+      }
+
+      const xBand = target.x < ROOM.width / 2 ? "WEST" : "EAST";
+      const yBand = target.y < ROOM.depth / 2 ? "NORTH" : "SOUTH";
+      return `${xBand}-${yBand}`;
+    }
+
+    function updateMotion(timestamp) {
+      if (lastTarget && lastTimestamp !== null) {
+        const dt = Math.max(0.001, timestamp - lastTimestamp);
+        const dx = target.x - lastTarget.x;
+        const dy = target.y - lastTarget.y;
+        const dz = target.z - lastTarget.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const instantSpeed = dist / dt;
+        motionSpeedFps = motionSpeedFps * 0.65 + instantSpeed * 0.35;
+      }
+
+      lastTarget = { ...target };
+      lastTimestamp = timestamp;
+    }
+
+    function project3D(x, y, z) {
+      if (cameraMode === "top") {
+        // Topside mode: strict XY map with subtle Z lift for readability.
+        return {
+          x: originX + (x - ROOM.width / 2) * feetToPx,
+          y: originY + (y - ROOM.depth / 2) * feetToPx - z * feetToPx * 0.18,
+        };
+      }
+
+      // 30-degree isometric mode.
+      const xOffset = x - ROOM.width / 2;
+      const yOffset = y - ROOM.depth / 2;
+      const cos30 = 0.866;
+      const sin30 = 0.5;
+
+      return {
+        x: originX + (xOffset - yOffset) * feetToPx * cos30,
+        y: originY + (xOffset + yOffset) * feetToPx * sin30 - z * feetToPx,
+      };
+    }
+
+    function drawEdge(a, b, corners) {
+      ctx.beginPath();
+      ctx.moveTo(corners[a].x, corners[a].y);
+      ctx.lineTo(corners[b].x, corners[b].y);
+      ctx.stroke();
+    }
+
+    function drawWireframeCube(minX, maxX, minY, maxY, minZ, maxZ, color, width = 1, dashed = false) {
+      const corners = [
+        project3D(minX, minY, minZ),
+        project3D(maxX, minY, minZ),
+        project3D(maxX, maxY, minZ),
+        project3D(minX, maxY, minZ),
+        project3D(minX, minY, maxZ),
+        project3D(maxX, minY, maxZ),
+        project3D(maxX, maxY, maxZ),
+        project3D(minX, maxY, maxZ),
+      ];
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.setLineDash(dashed ? [4, 4] : []);
+
+      drawEdge(0, 1, corners); drawEdge(1, 2, corners); drawEdge(2, 3, corners); drawEdge(3, 0, corners);
+      drawEdge(4, 5, corners); drawEdge(5, 6, corners); drawEdge(6, 7, corners); drawEdge(7, 4, corners);
+      drawEdge(0, 4, corners); drawEdge(1, 5, corners); drawEdge(2, 6, corners); drawEdge(3, 7, corners);
+    }
+
+    function connectSocket() {
+      const ws = new WebSocket("ws://127.0.0.1:8765");
+
+      ws.onopen = () => {
+        statusEl.textContent = trackingEnabled ? "PIPELINE STATUS: STREAM ACTIVE" : "PIPELINE STATUS: PAUSED BY OPERATOR";
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (!trackingEnabled) {
+          return;
+        }
+
+        target = data.vector;
+        clampTarget();
+        liveData.node_a = data.node_a_dbm;
+        liveData.node_b = data.node_b_dbm;
+        updateMotion(Number(data.timestamp));
+
+        dbmAEl.textContent = `${data.node_a_dbm} dBm`;
+        dbmBEl.textContent = `${data.node_b_dbm} dBm`;
+        targetEl.textContent = `[${target.x}, ${target.y}, ${target.z}]`;
+        floor1ZoneEl.textContent = describeFloor1Zone();
+
+        if (motionSpeedFps >= 0.7) {
+          motionEl.textContent = `MOVING (${motionSpeedFps.toFixed(2)} ft/s)`;
+          motionEl.className = "highlight alert-active";
+        } else {
+          motionEl.textContent = `STILL (${motionSpeedFps.toFixed(2)} ft/s)`;
+          motionEl.className = "highlight";
+        }
+
+        if (target.z > 9) {
+          floorEl.textContent = "LEVEL 02 // UPPER VOLUME";
+          floorEl.className = "highlight alert-active";
+        } else {
+          floorEl.textContent = "LEVEL 01 // GROUND FLOOR";
+          floorEl.className = "highlight";
+        }
+      };
+
+      ws.onclose = () => {
+        if (trackingEnabled) {
+          statusEl.textContent = "PIPELINE STATUS: RETRYING";
+        }
+        setTimeout(connectSocket, 1500);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+
+    function renderFrame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Ground grid.
+      ctx.strokeStyle = "rgba(0, 255, 204, 0.08)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      for (let x = 0; x <= ROOM.width; x += 2) {
+        const p1 = project3D(x, 0, 0);
+        const p2 = project3D(x, ROOM.depth, 0);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+
+      for (let y = 0; y <= ROOM.depth; y += 2) {
+        const p1 = project3D(0, y, 0);
+        const p2 = project3D(ROOM.width, y, 0);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+
+      drawWireframeCube(0, ROOM.width, 0, ROOM.depth, 0, 9, "rgba(0, 255, 204, 0.28)", 1.5, false);
+      drawWireframeCube(0, ROOM.width, 0, ROOM.depth, 9, ROOM.height, "rgba(0, 170, 255, 0.24)", 1.0, true);
+
+      const pNodeA = project3D(nodeA.x, nodeA.y, nodeA.z);
+      const pNodeB = project3D(nodeB.x, nodeB.y, nodeB.z);
+      const pTarget = project3D(target.x, target.y, target.z);
+
+      // Propagation circles in projected space.
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 7]);
+      ctx.strokeStyle = "rgba(0, 255, 204, 0.18)";
+      ctx.beginPath();
+      ctx.arc(pNodeA.x, pNodeA.y, RF_RADIUS_FT * feetToPx, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(0, 170, 255, 0.18)";
+      ctx.beginPath();
+      ctx.arc(pNodeB.x, pNodeB.y, RF_RADIUS_FT * feetToPx, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Nodes.
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#00ffcc";
+      ctx.beginPath();
+      ctx.arc(pNodeA.x, pNodeA.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#00aaff";
+      ctx.beginPath();
+      ctx.arc(pNodeB.x, pNodeB.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Laser lines.
+      ctx.strokeStyle = "rgba(0, 255, 204, 0.45)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pNodeA.x, pNodeA.y);
+      ctx.lineTo(pTarget.x, pTarget.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(0, 170, 255, 0.45)";
+      ctx.beginPath();
+      ctx.moveTo(pNodeB.x, pNodeB.y);
+      ctx.lineTo(pTarget.x, pTarget.y);
+      ctx.stroke();
+
+      // Vertical drop line.
+      const pTargetShadow = project3D(target.x, target.y, 0);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(pTarget.x, pTarget.y);
+      ctx.lineTo(pTargetShadow.x, pTargetShadow.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Pulsing lock marker.
+      const pulseRadius = 8 + Math.sin(Date.now() * 0.01) * 3;
+      ctx.strokeStyle = "#ff3366";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pTarget.x, pTarget.y, pulseRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(pTarget.x, pTarget.y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ff3366";
+      ctx.fill();
+
+      requestAnimationFrame(renderFrame);
+    }
+
+    zoomSlider.addEventListener("input", () => {
+      feetToPx = Number(zoomSlider.value);
+      displayScaleEl.textContent = `${feetToPx} px/ft`;
+    });
+
+    viewIsoBtn.addEventListener("click", () => setCameraMode("iso30"));
+    viewTopBtn.addEventListener("click", () => setCameraMode("top"));
+
+    goHideToggleBtn.addEventListener("click", () => {
+      setTrackingEnabled(!trackingEnabled);
+    });
+
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const delta = Math.sign(event.deltaY);
+      const next = Math.max(14, Math.min(56, feetToPx - delta));
+      feetToPx = next;
+      zoomSlider.value = String(next);
+      displayScaleEl.textContent = `${feetToPx} px/ft`;
+    }, { passive: false });
+
+    window.addEventListener("resize", resize);
+    resize();
+    setCameraMode("iso30");
+    showMissionReminder();
+    connectSocket();
+    requestAnimationFrame(renderFrame);
+  </script>
+</body>
+</html>
