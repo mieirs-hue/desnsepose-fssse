@@ -9,6 +9,10 @@ import serial
 import websockets
 from aiohttp import web
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
+DASHBOARD_PATH = os.path.join(BASE_DIR, "golf_green_interface.html")
+
 def get_serial_ports():
     """Get serial ports from environment variables or use defaults."""
     if sys.platform.startswith("win"):
@@ -31,10 +35,10 @@ CONNECTED_CLIENTS = set()
 def load_config():
     """Loads configuration from config.json."""
     try:
-        with open("config.json", "r") as f:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"[ERROR] Could not load or parse config.json: {e}", file=sys.stderr)
+        print(f"[ERROR] Could not load or parse {CONFIG_PATH}: {e}", file=sys.stderr)
         # Fallback to default values
         return {
             "sensitivity": {"rssi_threshold_near": -60, "rssi_threshold_mid": -80}
@@ -141,10 +145,10 @@ async def main() -> None:
 
     # --- HTTP Server Setup ---
     async def handle_index(request):
-        return web.FileResponse('golf_green_interface.html')
+        return web.FileResponse(DASHBOARD_PATH)
 
     async def handle_config(request):
-        return web.FileResponse('config.json')
+        return web.FileResponse(CONFIG_PATH)
 
     app = web.Application()
     app.add_routes([
