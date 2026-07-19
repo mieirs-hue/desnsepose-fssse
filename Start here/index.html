@@ -181,6 +181,49 @@
       color: #9bc8ff;
     }
 
+    #board-legend {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      z-index: 12;
+      display: grid;
+      gap: 8px;
+      min-width: 210px;
+      pointer-events: none;
+    }
+
+    .board-pill {
+      border: 1px solid rgba(122, 211, 255, 0.55);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(7, 20, 34, 0.86);
+      box-shadow: 0 0 16px rgba(0, 170, 255, 0.16);
+      font-family: "Consolas", "Lucida Console", monospace;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: #d8f2ff;
+    }
+
+    .board-pill strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 2px;
+      color: #ffffff;
+    }
+
+    .board-a {
+      border-color: rgba(0, 255, 204, 0.6);
+    }
+
+    .board-b {
+      border-color: rgba(0, 170, 255, 0.6);
+    }
+
+    .board-center {
+      border-color: rgba(255, 205, 64, 0.65);
+      color: #ffe9a8;
+    }
+
     canvas {
       width: 100vw;
       height: 100vh;
@@ -228,6 +271,11 @@
   </div>
 
   <div id="mission-reminder"></div>
+  <div id="board-legend">
+    <div class="board-pill board-a"><strong>BOARD A</strong>SQ 10 / SOUTHEAST</div>
+    <div class="board-pill board-b"><strong>BOARD B</strong>SQ 1 / NORTHWEST</div>
+    <div class="board-pill board-center"><strong>TOPSIDE BOUNDARY</strong>DUAL-SIDE TEST LINE</div>
+  </div>
 
   <canvas id="matrixCanvas"></canvas>
 
@@ -283,9 +331,9 @@
     const FILTER_ALPHA_IDLE = 0.2;
     const FILTER_ALPHA_MOVE = 0.34;
     const recentDiffs = [];
-    let satLockSide = "B";
+    let satLockSide = "A";
     const SIDE_CALIBRATION_DB = {
-      A: -4.5,
+      A: 10.0,
       B: 0.0,
     };
     const trailPoints = [];
@@ -457,7 +505,7 @@
         return lockedCellId;
       }
 
-      return satLockSide === "B" ? 10 : 1;
+      return satLockSide === "A" ? 10 : 1;
     }
 
     function updateCellLock() {
@@ -550,7 +598,7 @@
 
       // Force a side decision with hysteresis so the beacon does not linger in overlap.
       const switchToBThreshold = 0.8;
-      const switchToAThreshold = 5.0;
+      const switchToAThreshold = 1.5;
       if (satLockSide === "A" && smooth < -switchToBThreshold) {
         satLockSide = "B";
       } else if (satLockSide === "B" && smooth > switchToAThreshold) {
@@ -568,10 +616,10 @@
       }
 
       if (isPersonLockActive()) {
-        return `PERSON LOCK: BOARD ${satLockSide}`;
+        return `PERSON LOCK: BOARD ${satLockSide} / SQ ${getDisplayCellId()}`;
       }
 
-      return `TRACKING: BOARD ${satLockSide}`;
+      return `TRACKING: BOARD ${satLockSide} / SQ ${getDisplayCellId()}`;
     }
 
     function updateDisplayLabel() {
