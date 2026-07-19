@@ -710,6 +710,34 @@
       }
     }
 
+    function drawBoardBoundary() {
+      if (cameraMode !== "top") {
+        return;
+      }
+
+      const topA = project3D(ROOM.width / 2, 0, 0);
+      const bottomA = project3D(ROOM.width / 2, ROOM.depth, 0);
+      ctx.strokeStyle = "rgba(255, 205, 64, 0.9)";
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([10, 6]);
+      ctx.beginPath();
+      ctx.moveTo(topA.x, topA.y);
+      ctx.lineTo(bottomA.x, bottomA.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = "bold 16px Consolas, 'Lucida Console', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.75)";
+      ctx.fillStyle = "rgba(255, 205, 64, 0.98)";
+      ctx.strokeText("BOARD A SIDE", topA.x - 150, canvas.height * 0.16);
+      ctx.fillText("BOARD A SIDE", topA.x - 150, canvas.height * 0.16);
+      ctx.strokeText("BOARD B SIDE", topA.x + 150, canvas.height * 0.16);
+      ctx.fillText("BOARD B SIDE", topA.x + 150, canvas.height * 0.16);
+    }
+
     function connectSocket() {
       const ws = new WebSocket("ws://127.0.0.1:8765");
 
@@ -805,6 +833,7 @@
       drawWireframeCube(0, ROOM.width, 0, ROOM.depth, 0, ROOM.height, "rgba(0, 255, 204, 0.28)", 1.5, false);
       if (cameraMode === "top") {
         drawTopsideTenCellOverlay();
+        drawBoardBoundary();
       }
 
       const pNodeA = project3D(nodeA.x, nodeA.y, nodeA.z);
@@ -852,17 +881,31 @@
       ctx.beginPath();
       ctx.arc(pNodeA.x, pNodeA.y, 6, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "rgba(210, 244, 255, 0.95)";
-      ctx.font = "bold 13px Consolas, 'Lucida Console', monospace";
+      ctx.save();
+      ctx.font = "bold 15px Consolas, 'Lucida Console', monospace";
       ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.fillText("BOARD A", pNodeA.x + 10, pNodeA.y - 10);
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+      ctx.fillStyle = "rgba(210, 244, 255, 1.0)";
+      ctx.strokeText("BOARD A", pNodeA.x + 12, pNodeA.y - 16);
+      ctx.fillText("BOARD A", pNodeA.x + 12, pNodeA.y - 16);
+      ctx.restore();
 
       ctx.fillStyle = "#00aaff";
       ctx.beginPath();
       ctx.arc(pNodeB.x, pNodeB.y, 6, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillText("BOARD B", pNodeB.x + 10, pNodeB.y - 10);
+      ctx.save();
+      ctx.font = "bold 15px Consolas, 'Lucida Console', monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+      ctx.fillStyle = "rgba(210, 244, 255, 1.0)";
+      ctx.strokeText("BOARD B", pNodeB.x + 12, pNodeB.y - 16);
+      ctx.fillText("BOARD B", pNodeB.x + 12, pNodeB.y - 16);
+      ctx.restore();
 
       // Laser lines.
       ctx.strokeStyle = "rgba(0, 255, 204, 0.45)";
@@ -917,9 +960,12 @@
       }
 
       ctx.fillStyle = getStreamStalenessMs() > 1800 ? "rgba(255, 159, 28, 0.95)" : (isPersonLockActive() ? "rgba(255, 17, 68, 0.95)" : "rgba(0, 255, 204, 0.9)");
-      ctx.font = "bold 15px Consolas, 'Lucida Console', monospace";
+      ctx.font = "bold 18px Consolas, 'Lucida Console', monospace";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+      ctx.strokeText(getDisplayLabelText(), 22, 40);
       ctx.fillText(getDisplayLabelText(), 22, 40);
 
       ctx.strokeStyle = "rgba(255, 91, 122, 0.8)";
