@@ -244,7 +244,6 @@
       <button id="go-hide-toggle" type="button"><span id="run-led"></span><span id="go-hide-label">GO GO HIDE: RUNNING</span></button>
     </div>
     <div class="btn-row">
-      <button id="view-iso" class="view-btn active" type="button">30 DEG ANGLE</button>
       <button id="view-top" class="view-btn" type="button">TOPSIDE</button>
     </div>
     <div class="zoom-wrap">
@@ -298,7 +297,6 @@
     const statusEl = document.getElementById("status-badge");
     const linkHealthEl = document.getElementById("link-health");
     const zoomSlider = document.getElementById("zoom-slider");
-    const viewIsoBtn = document.getElementById("view-iso");
     const viewTopBtn = document.getElementById("view-top");
     const goHideToggleBtn = document.getElementById("go-hide-toggle");
     const runLedEl = document.getElementById("run-led");
@@ -311,7 +309,7 @@
     let feetToPx = 28;
     const nodeA = { x: ROOM.width, y: ROOM.depth, z: 9 };
     const nodeB = { x: 0, y: 0, z: 9 };
-    let cameraMode = "iso30";
+    let cameraMode = "top";
     let trackingEnabled = true;
     let reminderTimer = null;
 
@@ -357,9 +355,8 @@
     }
 
     function setCameraMode(mode) {
-      cameraMode = mode;
-      viewIsoBtn.classList.toggle("active", mode === "iso30");
-      viewTopBtn.classList.toggle("active", mode === "top");
+      cameraMode = "top";
+      viewTopBtn.classList.add("active");
     }
 
     function showMissionReminder() {
@@ -1048,7 +1045,6 @@
       displayScaleEl.textContent = `${feetToPx} px/ft`;
     });
 
-    viewIsoBtn.addEventListener("click", () => setCameraMode("iso30"));
     viewTopBtn.addEventListener("click", () => setCameraMode("top"));
 
     goHideToggleBtn.addEventListener("click", () => {
@@ -1066,7 +1062,7 @@
 
     window.addEventListener("resize", resize);
     resize();
-    setCameraMode("iso30");
+    setCameraMode("top");
     showMissionReminder();
     connectSocket();
     requestAnimationFrame(renderFrame);
