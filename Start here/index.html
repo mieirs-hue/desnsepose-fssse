@@ -259,7 +259,7 @@
 
     const ROOM = { width: 20, depth: 10, height: 9 };
     const TOPSIDE_GRID = { cols: 5, rows: 2 }; // 10 total mapping cells.
-    const RF_RADIUS_FT = 5;
+    const RF_RADIUS_FT = 12;
     let feetToPx = 28;
     const nodeA = { x: ROOM.width, y: ROOM.depth, z: 9 };
     const nodeB = { x: 0, y: 0, z: 9 };
@@ -315,7 +315,7 @@
     }
 
     function showMissionReminder() {
-      missionReminderEl.textContent = "MISSION: Find a person in the single-floor office via ESP32-S3 A/B RF telemetry. Room: 20ft wide x 10ft deep x 9ft high. Sphere radius: 5ft (10ft diameter). A=SE near ceiling, B=NW near ceiling.";
+      missionReminderEl.textContent = "MISSION: Find a person in the single-floor office via ESP32-S3 A/B RF telemetry. Room: 20ft wide x 10ft deep x 9ft high. Sphere radius: 12ft (24ft diameter). A=SE near ceiling, B=NW near ceiling.";
       missionReminderEl.classList.add("show");
       clearTimeout(reminderTimer);
       reminderTimer = setTimeout(() => {
@@ -703,7 +703,8 @@
           ctx.font = "bold 11px Consolas, 'Lucida Console', monospace";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(String(cell), center.x, center.y);
+          const cellLabel = cell === 6 ? "CatWoman on the prowl" : String(cell);
+          ctx.fillText(cellLabel, center.x, center.y);
           cell += 1;
         }
       }
@@ -851,11 +852,17 @@
       ctx.beginPath();
       ctx.arc(pNodeA.x, pNodeA.y, 6, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = "rgba(210, 244, 255, 0.95)";
+      ctx.font = "bold 13px Consolas, 'Lucida Console', monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("BOARD A", pNodeA.x + 10, pNodeA.y - 10);
 
       ctx.fillStyle = "#00aaff";
       ctx.beginPath();
       ctx.arc(pNodeB.x, pNodeB.y, 6, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillText("BOARD B", pNodeB.x + 10, pNodeB.y - 10);
 
       // Laser lines.
       ctx.strokeStyle = "rgba(0, 255, 204, 0.45)";
