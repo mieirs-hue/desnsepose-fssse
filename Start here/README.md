@@ -1,9 +1,14 @@
 # Sentry Matrix (RF-Only)
 
 ## Files
-- `sentry_daemon.py`: Reads RSSI from COM5/COM10 and broadcasts telemetry on `ws://127.0.0.1:8765`.
+- `sentry_daemon.py`: Reads RSSI from /dev/ttyACM0 and /dev/ttyACM1 on Linux (or COM5/COM10 on Windows) and broadcasts telemetry on `ws://127.0.0.1:8765`.
 - `index.html`: 3D isometric dashboard for live tracking visualization.
 - `requirements.txt`: Python dependencies.
+
+## Anchor Orientation (Required)
+- Mount both ESP32-S3 boards vertically.
+- USB-C connector points downward (same orientation on A and B).
+- Do not rotate one board relative to the other after calibration.
 
 ## Setup
 1. Open a terminal in this folder.

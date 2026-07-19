@@ -138,6 +138,11 @@
       box-shadow: 0 0 9px rgba(255, 54, 93, 0.65);
     }
 
+    #run-led.offline {
+      background: #ff9f1c;
+      box-shadow: 0 0 9px rgba(255, 159, 28, 0.65);
+    }
+
     #mission-reminder {
       position: absolute;
       left: 18px;
@@ -210,12 +215,16 @@
     <div class="metric">TARGET COORDS: <span id="target-xyz" class="highlight">[10.0, 5.0, 0.0]</span></div>
     <div class="metric">ACTIVE LEVEL: <span id="floor-status" class="highlight">INITIALIZING</span></div>
     <div class="metric">MOTION STATE: <span id="motion-state" class="highlight">CALIBRATING</span></div>
-    <div class="metric">FLOOR-1 ZONE: <span id="floor1-zone" class="highlight">UNKNOWN</span></div>
+    <div class="metric">POSITION SECTOR: <span id="floor1-zone" class="highlight">UNKNOWN</span></div>
+    <div class="metric">BULLSEYE LOCK: <span id="bullseye-status" class="highlight">SEEKING</span></div>
+    <div class="metric">SATELLITE BEACON: <span id="sat-beacon-status" class="highlight">CALIBRATING</span></div>
+    <div class="metric">DISPLAY LABEL: <span id="display-label" class="highlight">BOARD B</span></div>
     <div class="metric">TRACKING GOAL: <span id="goal-text" class="highlight">FIND A PERSON USING ESP32-S3 A/B</span></div>
-    <div class="metric">ROOM: <span id="room-scale" class="highlight">20ft x 10ft x 18ft</span></div>
+    <div class="metric">ROOM: <span id="room-scale" class="highlight">20ft x 10ft x 9ft</span></div>
     <div class="metric">RF DIAMETER: <span id="rf-diameter" class="highlight">40ft</span></div>
     <div class="metric">DISPLAY SCALE: <span id="display-scale" class="highlight">28 px/ft</span></div>
     <div id="status-badge" class="metric">PIPELINE STATUS: CONNECTING</div>
+    <div class="metric">LIVE LINK: <span id="link-health" class="highlight">WAITING FOR PACKETS</span></div>
   </div>
 
   <div id="mission-reminder"></div>
@@ -232,10 +241,14 @@
     const floorEl = document.getElementById("floor-status");
     const motionEl = document.getElementById("motion-state");
     const floor1ZoneEl = document.getElementById("floor1-zone");
+    const bullseyeEl = document.getElementById("bullseye-status");
+    const satBeaconEl = document.getElementById("sat-beacon-status");
+    const displayLabelEl = document.getElementById("display-label");
     const roomScaleEl = document.getElementById("room-scale");
     const rfDiameterEl = document.getElementById("rf-diameter");
     const displayScaleEl = document.getElementById("display-scale");
     const statusEl = document.getElementById("status-badge");
+    const linkHealthEl = document.getElementById("link-health");
     const zoomSlider = document.getElementById("zoom-slider");
     const viewIsoBtn = document.getElementById("view-iso");
     const viewTopBtn = document.getElementById("view-top");
@@ -244,8 +257,9 @@
     const goHideLabelEl = document.getElementById("go-hide-label");
     const missionReminderEl = document.getElementById("mission-reminder");
 
-    const ROOM = { width: 20, depth: 10, height: 18 };
-    const RF_RADIUS_FT = 20;
+    const ROOM = { width: 20, depth: 10, height: 9 };
+    const TOPSIDE_GRID = { cols: 5, rows: 2 }; // 10 total mapping cells.
+    const RF_RADIUS_FT = 5;
     let feetToPx = 28;
     const nodeA = { x: ROOM.width, y: ROOM.depth, z: 9 };
     const nodeB = { x: 0, y: 0, z: 9 };
@@ -256,11 +270,32 @@
     let originX = 0;
     let originY = 0;
 
-    let target = { x: 10, y: 5, z: 0 };
+    let target = { x: 10, y: 5, z: 4.5 };
     let liveData = { node_a: -80, node_b: -80 };
     let lastTarget = null;
     let lastTimestamp = null;
     let motionSpeedFps = 0;
+    const recentCells = [];
+    let lockedCellId = null;
+    let lockExpiresAt = 0;
+    const MOTION_LOCK_THRESHOLD_FPS = 0.7;
+    const CELL_LOCK_HOLD_MS = 4500;
+    const FILTER_ALPHA_IDLE = 0.2;
+    const FILTER_ALPHA_MOVE = 0.34;
+    const recentDiffs = [];
+    let satLockSide = "B";
+    const SIDE_CALIBRATION_DB = {
+      A: -4.5,
+      B: 0.0,
+    };
+    const trailPoints = [];
+    const recentPacketDeltasMs = [];
+    let lastPacketAtMs = 0;
+    let lastPacketGapMs = 0;
+    let personLockTarget = { x: 10, y: 5, z: 4.5 };
+    let personLockCellId = null;
+    let personLockExpiresAt = 0;
+    let personLockActive = false;
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -280,7 +315,7 @@
     }
 
     function showMissionReminder() {
-      missionReminderEl.textContent = "MISSION: Find a person in the first-floor office via ESP32-S3 A/B RF telemetry. Room: 20ft wide x 10ft deep x 18ft high. Sphere radius: 20ft (40ft diameter). A=SE near ceiling, B=NW near ceiling.";
+      missionReminderEl.textContent = "MISSION: Find a person in the single-floor office via ESP32-S3 A/B RF telemetry. Room: 20ft wide x 10ft deep x 9ft high. Sphere radius: 5ft (10ft diameter). A=SE near ceiling, B=NW near ceiling.";
       missionReminderEl.classList.add("show");
       clearTimeout(reminderTimer);
       reminderTimer = setTimeout(() => {
@@ -302,6 +337,89 @@
         runLedEl.classList.add("paused");
         goHideLabelEl.textContent = "GO GO HIDE: STOPPED";
         statusEl.textContent = "PIPELINE STATUS: PAUSED BY OPERATOR";
+        linkHealthEl.textContent = "PAUSED";
+      }
+    }
+
+    function markPacketHeartbeat() {
+      const nowMs = performance.now();
+      if (lastPacketAtMs > 0) {
+        lastPacketGapMs = nowMs - lastPacketAtMs;
+        recentPacketDeltasMs.push(lastPacketGapMs);
+        if (recentPacketDeltasMs.length > 60) {
+          recentPacketDeltasMs.shift();
+        }
+      }
+      lastPacketAtMs = nowMs;
+    }
+
+    function getStreamStalenessMs() {
+      if (lastPacketAtMs === 0) {
+        return Infinity;
+      }
+      return performance.now() - lastPacketAtMs;
+    }
+
+    function isPersonLockActive() {
+      return personLockActive && performance.now() < personLockExpiresAt && getStreamStalenessMs() <= 2200;
+    }
+
+    function releasePersonLock() {
+      personLockActive = false;
+      personLockCellId = null;
+    }
+
+    function updateLinkHealthStatus() {
+      if (!trackingEnabled) {
+        return;
+      }
+
+      const staleMs = getStreamStalenessMs();
+      const avgGapMs = recentPacketDeltasMs.length
+        ? recentPacketDeltasMs.reduce((sum, value) => sum + value, 0) / recentPacketDeltasMs.length
+        : 0;
+      const hz = avgGapMs > 0 ? 1000 / avgGapMs : 0;
+
+      if (staleMs > 1800) {
+        statusEl.textContent = "PIPELINE STATUS: STALE STREAM";
+        linkHealthEl.textContent = "NO FRESH TELEMETRY";
+        runLedEl.classList.add("offline");
+      } else if (staleMs > 800) {
+        statusEl.textContent = "PIPELINE STATUS: DEGRADED";
+        linkHealthEl.textContent = `LAG ${Math.round(staleMs)}ms`;
+        runLedEl.classList.add("offline");
+      } else {
+        statusEl.textContent = "PIPELINE STATUS: STREAM ACTIVE";
+        linkHealthEl.textContent = `LIVE ${hz.toFixed(1)}Hz`;
+        runLedEl.classList.remove("offline");
+      }
+    }
+
+    function updatePersonLock() {
+      const staleMs = getStreamStalenessMs();
+      const confidence = getBullseyeConfidence();
+      const liveCell = getTopsideCellId(target.x, target.y);
+
+      if (staleMs > 2200) {
+        releasePersonLock();
+        return;
+      }
+
+      if (confidence >= 58) {
+        personLockActive = true;
+        personLockTarget = { ...target };
+        personLockCellId = liveCell;
+        personLockExpiresAt = performance.now() + 3200;
+        return;
+      }
+
+      if (personLockActive && performance.now() < personLockExpiresAt && confidence >= 40) {
+        personLockExpiresAt = performance.now() + 1800;
+        return;
+      }
+
+      if (personLockActive && confidence < 35) {
+        releasePersonLock();
       }
     }
 
@@ -312,13 +430,163 @@
     }
 
     function describeFloor1Zone() {
-      if (target.z > 9) {
-        return "ABOVE FLOOR 1";
+      const shownCell = isPersonLockActive() && personLockCellId !== null ? personLockCellId : getDisplayCellId();
+      const centerX = ((shownCell - 1) % TOPSIDE_GRID.cols + 0.5) * (ROOM.width / TOPSIDE_GRID.cols);
+      const centerY = (Math.floor((shownCell - 1) / TOPSIDE_GRID.cols) + 0.5) * (ROOM.depth / TOPSIDE_GRID.rows);
+      const xBand = centerX < ROOM.width / 2 ? "WEST" : "EAST";
+      const yBand = centerY < ROOM.depth / 2 ? "NORTH" : "SOUTH";
+      const lockTag = isPersonLockActive() ? " LOCKED" : (isCellLockActive() ? " LOCKED" : " LIVE");
+      return `CELL ${shownCell}${lockTag} (${xBand}-${yBand})`;
+    }
+
+    function getTopsideCellId(x, y) {
+      const col = Math.min(TOPSIDE_GRID.cols - 1, Math.max(0, Math.floor((x / ROOM.width) * TOPSIDE_GRID.cols)));
+      const row = Math.min(TOPSIDE_GRID.rows - 1, Math.max(0, Math.floor((y / ROOM.depth) * TOPSIDE_GRID.rows)));
+      return row * TOPSIDE_GRID.cols + col + 1;
+    }
+
+    function isCellLockActive() {
+      return lockedCellId !== null && performance.now() < lockExpiresAt;
+    }
+
+    function getDisplayCellId() {
+      if (isPersonLockActive() && personLockCellId !== null) {
+        return personLockCellId;
+      }
+      if (isCellLockActive() && lockedCellId !== null) {
+        return lockedCellId;
       }
 
-      const xBand = target.x < ROOM.width / 2 ? "WEST" : "EAST";
-      const yBand = target.y < ROOM.depth / 2 ? "NORTH" : "SOUTH";
-      return `${xBand}-${yBand}`;
+      return satLockSide === "B" ? 10 : 1;
+    }
+
+    function updateCellLock() {
+      const liveCell = getTopsideCellId(target.x, target.y);
+      recentCells.push(liveCell);
+      if (recentCells.length > 12) {
+        recentCells.shift();
+      }
+
+      const counts = new Map();
+      for (const cell of recentCells) {
+        counts.set(cell, (counts.get(cell) || 0) + 1);
+      }
+
+      let dominantCell = liveCell;
+      let dominantCount = 0;
+      for (const [cell, count] of counts.entries()) {
+        if (count > dominantCount) {
+          dominantCell = cell;
+          dominantCount = count;
+        }
+      }
+
+      if (motionSpeedFps >= MOTION_LOCK_THRESHOLD_FPS) {
+        lockedCellId = dominantCell;
+        lockExpiresAt = performance.now() + CELL_LOCK_HOLD_MS;
+      }
+
+      const staleMs = getStreamStalenessMs();
+      if (staleMs > 2200) {
+        lockedCellId = null;
+      }
+    }
+
+    function getDominantRecentCellRatio() {
+      if (recentCells.length === 0) {
+        return 0;
+      }
+
+      const counts = new Map();
+      for (const cell of recentCells) {
+        counts.set(cell, (counts.get(cell) || 0) + 1);
+      }
+
+      let maxCount = 0;
+      for (const count of counts.values()) {
+        if (count > maxCount) {
+          maxCount = count;
+        }
+      }
+      return maxCount / recentCells.length;
+    }
+
+    function getBullseyeConfidence() {
+      const signalSplit = Math.abs(liveData.node_a - liveData.node_b);
+      const cellDominance = getDominantRecentCellRatio();
+      const lockBonus = isCellLockActive() ? 18 : 0;
+      const motionPenalty = Math.max(0, motionSpeedFps - 3) * 7;
+      const score = Math.max(0, Math.min(100, signalSplit * 7 + cellDominance * 35 + lockBonus - motionPenalty));
+      return score;
+    }
+
+    function getBullseyeLabel(score) {
+      if (score >= 78) {
+        return "HARD LOCK";
+      }
+      if (score >= 55) {
+        return "TRACKING";
+      }
+      return "SEEKING";
+    }
+
+    function updateBullseyeStatus() {
+      const score = getBullseyeConfidence();
+      const label = getBullseyeLabel(score);
+      const lockPrefix = isPersonLockActive() ? "PERSON LOCK" : label;
+      bullseyeEl.textContent = `${lockPrefix} (${score.toFixed(0)}%)`;
+      bullseyeEl.className = score >= 58 ? "highlight alert-active" : "highlight";
+    }
+
+    function updateSatelliteBeaconStatus() {
+      const diff = (liveData.node_a + SIDE_CALIBRATION_DB.A) - (liveData.node_b + SIDE_CALIBRATION_DB.B);
+      recentDiffs.push(diff);
+      if (recentDiffs.length > 28) {
+        recentDiffs.shift();
+      }
+
+      const smooth = recentDiffs.reduce((sum, value) => sum + value, 0) / recentDiffs.length;
+      const strengthPct = Math.min(99, Math.abs(smooth) * 10);
+
+      // Force a side decision with hysteresis so the beacon does not linger in overlap.
+      const switchToBThreshold = 0.8;
+      const switchToAThreshold = 5.0;
+      if (satLockSide === "A" && smooth < -switchToBThreshold) {
+        satLockSide = "B";
+      } else if (satLockSide === "B" && smooth > switchToAThreshold) {
+        satLockSide = "A";
+      }
+
+      const quality = strengthPct >= 30 ? "STRONG" : "SOFT";
+      satBeaconEl.textContent = `TRACKING BOARD ${satLockSide} ${quality} (${strengthPct.toFixed(0)}%)`;
+      satBeaconEl.className = "highlight alert-active";
+    }
+
+    function getDisplayLabelText() {
+      if (getStreamStalenessMs() > 1800) {
+        return "NO LIVE LABEL";
+      }
+
+      if (isPersonLockActive()) {
+        return `PERSON LOCK: BOARD ${satLockSide}`;
+      }
+
+      return `TRACKING: BOARD ${satLockSide}`;
+    }
+
+    function updateDisplayLabel() {
+      displayLabelEl.textContent = getDisplayLabelText();
+      displayLabelEl.className = "highlight alert-active";
+    }
+
+    function getCellCenter(cellId) {
+      const idx = Math.max(1, Math.min(TOPSIDE_GRID.cols * TOPSIDE_GRID.rows, cellId)) - 1;
+      const col = idx % TOPSIDE_GRID.cols;
+      const row = Math.floor(idx / TOPSIDE_GRID.cols);
+      return {
+        x: (col + 0.5) * (ROOM.width / TOPSIDE_GRID.cols),
+        y: (row + 0.5) * (ROOM.depth / TOPSIDE_GRID.rows),
+      };
     }
 
     function updateMotion(timestamp) {
@@ -385,6 +653,62 @@
       drawEdge(0, 4, corners); drawEdge(1, 5, corners); drawEdge(2, 6, corners); drawEdge(3, 7, corners);
     }
 
+    function drawTopsideTenCellOverlay() {
+      const cellW = ROOM.width / TOPSIDE_GRID.cols;
+      const cellH = ROOM.depth / TOPSIDE_GRID.rows;
+      const activeCell = getDisplayCellId();
+      let cell = 1;
+
+      for (let row = 0; row < TOPSIDE_GRID.rows; row += 1) {
+        for (let col = 0; col < TOPSIDE_GRID.cols; col += 1) {
+          const minX = col * cellW;
+          const maxX = minX + cellW;
+          const minY = row * cellH;
+          const maxY = minY + cellH;
+
+          const p0 = project3D(minX, minY, 0);
+          const p1 = project3D(maxX, minY, 0);
+          const p2 = project3D(maxX, maxY, 0);
+          const p3 = project3D(minX, maxY, 0);
+
+          let fill = row % 2 === col % 2 ? "rgba(0, 170, 255, 0.05)" : "rgba(0, 255, 204, 0.04)";
+          let stroke = "rgba(122, 211, 255, 0.5)";
+          let lineW = 1.2;
+          if (cell === activeCell) {
+            fill = isPersonLockActive() ? "rgba(255, 17, 68, 0.34)" : (isCellLockActive() ? "rgba(255, 51, 102, 0.26)" : "rgba(0, 255, 204, 0.24)");
+            stroke = isPersonLockActive() ? "rgba(255, 34, 68, 1.0)" : (isCellLockActive() ? "rgba(255, 102, 140, 0.95)" : "rgba(0, 255, 204, 0.9)");
+            lineW = 2.2;
+          } else if (cell !== 1 && cell !== 10) {
+            fill = "rgba(122, 211, 255, 0.015)";
+            stroke = "rgba(122, 211, 255, 0.12)";
+            lineW = 0.8;
+          }
+
+          ctx.fillStyle = fill;
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.lineTo(p3.x, p3.y);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = lineW;
+          ctx.setLineDash([]);
+          ctx.stroke();
+
+          const center = project3D(minX + cellW / 2, minY + cellH / 2, 0);
+          ctx.fillStyle = "rgba(210, 244, 255, 0.88)";
+          ctx.font = "bold 11px Consolas, 'Lucida Console', monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(cell), center.x, center.y);
+          cell += 1;
+        }
+      }
+    }
+
     function connectSocket() {
       const ws = new WebSocket("ws://127.0.0.1:8765");
 
@@ -398,15 +722,32 @@
           return;
         }
 
-        target = data.vector;
+        markPacketHeartbeat();
+
+        const incoming = data.vector;
+        const alpha = motionSpeedFps >= MOTION_LOCK_THRESHOLD_FPS ? FILTER_ALPHA_MOVE : FILTER_ALPHA_IDLE;
+        target.x += (incoming.x - target.x) * alpha;
+        target.y += (incoming.y - target.y) * alpha;
+        target.z += (incoming.z - target.z) * alpha;
         clampTarget();
         liveData.node_a = data.node_a_dbm;
         liveData.node_b = data.node_b_dbm;
         updateMotion(Number(data.timestamp));
+        updateCellLock();
+        updatePersonLock();
+        updateBullseyeStatus();
+        updateSatelliteBeaconStatus();
+        updateDisplayLabel();
+        updateLinkHealthStatus();
+
+        trailPoints.push({ x: target.x, y: target.y, z: target.z, t: performance.now() });
+        if (trailPoints.length > 90) {
+          trailPoints.shift();
+        }
 
         dbmAEl.textContent = `${data.node_a_dbm} dBm`;
         dbmBEl.textContent = `${data.node_b_dbm} dBm`;
-        targetEl.textContent = `[${target.x}, ${target.y}, ${target.z}]`;
+        targetEl.textContent = `[${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}]`;
         floor1ZoneEl.textContent = describeFloor1Zone();
 
         if (motionSpeedFps >= 0.7) {
@@ -417,18 +758,15 @@
           motionEl.className = "highlight";
         }
 
-        if (target.z > 9) {
-          floorEl.textContent = "LEVEL 02 // UPPER VOLUME";
-          floorEl.className = "highlight alert-active";
-        } else {
-          floorEl.textContent = "LEVEL 01 // GROUND FLOOR";
-          floorEl.className = "highlight";
-        }
+        floorEl.textContent = "LEVEL 01 // SINGLE STORY";
+        floorEl.className = "highlight";
       };
 
       ws.onclose = () => {
         if (trackingEnabled) {
           statusEl.textContent = "PIPELINE STATUS: RETRYING";
+          linkHealthEl.textContent = "RECONNECTING";
+          runLedEl.classList.add("offline");
         }
         setTimeout(connectSocket, 1500);
       };
@@ -463,12 +801,36 @@
         ctx.stroke();
       }
 
-      drawWireframeCube(0, ROOM.width, 0, ROOM.depth, 0, 9, "rgba(0, 255, 204, 0.28)", 1.5, false);
-      drawWireframeCube(0, ROOM.width, 0, ROOM.depth, 9, ROOM.height, "rgba(0, 170, 255, 0.24)", 1.0, true);
+      drawWireframeCube(0, ROOM.width, 0, ROOM.depth, 0, ROOM.height, "rgba(0, 255, 204, 0.28)", 1.5, false);
+      if (cameraMode === "top") {
+        drawTopsideTenCellOverlay();
+      }
 
       const pNodeA = project3D(nodeA.x, nodeA.y, nodeA.z);
       const pNodeB = project3D(nodeB.x, nodeB.y, nodeB.z);
-      const pTarget = project3D(target.x, target.y, target.z);
+      const activeTarget = isPersonLockActive() ? personLockTarget : target;
+      const pTarget = project3D(activeTarget.x, activeTarget.y, activeTarget.z);
+
+      updateLinkHealthStatus();
+
+      // Live motion trail from recent telemetry points.
+      if (trailPoints.length > 1) {
+        ctx.beginPath();
+        for (let i = 0; i < trailPoints.length; i += 1) {
+          const p = project3D(trailPoints[i].x, trailPoints[i].y, trailPoints[i].z);
+          if (i === 0) {
+            ctx.moveTo(p.x, p.y);
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
+        }
+        const staleMs = getStreamStalenessMs();
+        ctx.strokeStyle = staleMs > 1200 ? "rgba(255, 159, 28, 0.3)" : "rgba(0, 255, 204, 0.35)";
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([5, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
 
       // Propagation circles in projected space.
       ctx.lineWidth = 1;
@@ -521,16 +883,61 @@
 
       // Pulsing lock marker.
       const pulseRadius = 8 + Math.sin(Date.now() * 0.01) * 3;
-      ctx.strokeStyle = "#ff3366";
-      ctx.lineWidth = 2;
+      let bullseyeX = pTarget.x;
+      let bullseyeY = pTarget.y;
+
+      ctx.strokeStyle = isPersonLockActive() ? "#ff1144" : "#ff3366";
+      ctx.lineWidth = isPersonLockActive() ? 3 : 2;
       ctx.beginPath();
-      ctx.arc(pTarget.x, pTarget.y, pulseRadius, 0, Math.PI * 2);
+      ctx.arc(bullseyeX, bullseyeY, pulseRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (cameraMode === "top" && (isCellLockActive() || isPersonLockActive())) {
+        const center = isPersonLockActive() && personLockCellId !== null ? getCellCenter(personLockCellId) : getCellCenter(getDisplayCellId());
+        const pCenter = project3D(center.x, center.y, 0);
+        ctx.strokeStyle = isPersonLockActive() ? "rgba(255, 34, 68, 0.98)" : "rgba(255, 205, 64, 0.9)";
+        ctx.lineWidth = isPersonLockActive() ? 3 : 2;
+        ctx.strokeRect(pCenter.x - 10, pCenter.y - 10, 20, 20);
+      }
+
+      const staleMs = getStreamStalenessMs();
+      if (staleMs > 1800) {
+        ctx.fillStyle = "rgba(255, 159, 28, 0.9)";
+        ctx.font = "bold 14px Consolas, 'Lucida Console', monospace";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText("LIVE FEED STALE", 22, 18);
+      }
+
+      ctx.fillStyle = getStreamStalenessMs() > 1800 ? "rgba(255, 159, 28, 0.95)" : (isPersonLockActive() ? "rgba(255, 17, 68, 0.95)" : "rgba(0, 255, 204, 0.9)");
+      ctx.font = "bold 15px Consolas, 'Lucida Console', monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(getDisplayLabelText(), 22, 40);
+
+      ctx.strokeStyle = "rgba(255, 91, 122, 0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(bullseyeX, bullseyeY, pulseRadius + 8, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(pTarget.x, pTarget.y, 2.5, 0, Math.PI * 2);
+      ctx.arc(bullseyeX, bullseyeY, pulseRadius + 16, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(bullseyeX, bullseyeY, 2.5, 0, Math.PI * 2);
       ctx.fillStyle = "#ff3366";
       ctx.fill();
+
+      ctx.strokeStyle = "rgba(255, 91, 122, 0.7)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(bullseyeX - 14, bullseyeY);
+      ctx.lineTo(bullseyeX + 14, bullseyeY);
+      ctx.moveTo(bullseyeX, bullseyeY - 14);
+      ctx.lineTo(bullseyeX, bullseyeY + 14);
+      ctx.stroke();
 
       requestAnimationFrame(renderFrame);
     }

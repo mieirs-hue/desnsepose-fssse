@@ -1,21 +1,33 @@
 import asyncio
 import json
 import math
+import os
 import re
+import sys
 from dataclasses import dataclass
 
 import serial
 import websockets
 
-# Explicit hardware mapping from your port audit
+if sys.platform.startswith("win"):
+    default_port_a = "COM5"
+    default_port_b = "COM10"
+else:
+    default_port_a = "/dev/ttyACM0"
+    default_port_b = "/dev/ttyACM1"
+
+# Allow overriding from environment for flexible deployment.
 SERIAL_PORTS = {
-    "A": "COM5",   # Left wall anchor at (0, 5, 9)
-    "B": "COM10",  # Right wall anchor at (20, 5, 9)
+    "A": os.getenv("SENTRY_PORT_A", default_port_a),
+    "B": os.getenv("SENTRY_PORT_B", default_port_b),
 }
 
 BAUD_RATE = 115200
 WS_HOST = "127.0.0.1"
 WS_PORT = 8765
+
+# Hardware assumption: both ESP32-S3 anchors are mounted vertically,
+# with USB-C connectors facing downward.
 
 
 @dataclass
@@ -30,18 +42,23 @@ class SignalState:
             self.signal_b = value
 
     def calculate_spatial_vector(self) -> dict:
-        # Office volume model: 20ft x 10ft x 18ft.
+        # Office volume model: 20ft x 10ft x 9ft (single story).
         norm_a = max(0.0, min(1.0, (self.signal_a + 100.0) / 60.0))
         norm_b = max(0.0, min(1.0, (self.signal_b + 100.0) / 60.0))
 
-        x = 10.0 + (norm_a - norm_b) * 10.0
-        y = 5.0 + math.sin((norm_a + norm_b) * math.pi) * 2.0
-        z = (norm_a + norm_b) * 9.0
+        # Differential model: avoid periodic trajectories from trig-based mapping.
+        # balance < 0 means stronger B, balance > 0 means stronger A.
+        balance = norm_a - norm_b
+        strength = (norm_a + norm_b) * 0.5
+
+        x = 10.0 + balance * 9.0
+        y = 5.0 + (strength - 0.5) * 4.0 + balance * 1.2
+        z = 1.5 + strength * 6.0
 
         return {
             "x": round(max(0.0, min(20.0, x)), 2),
             "y": round(max(0.0, min(10.0, y)), 2),
-            "z": round(max(0.0, min(18.0, z)), 2),
+            "z": round(max(0.0, min(9.0, z)), 2),
         }
 
 
@@ -49,18 +66,31 @@ state = SignalState()
 
 
 def parse_rssi(line: str) -> float | None:
-    if "rssi" not in line.lower():
+    lowered = line.lower()
+    if "rssi" not in lowered:
         return None
 
-    # Accept values like: "RSSI: -67.5 dBm"
-    match = re.search(r"(-?\d+(?:\.\d+)?)", line)
-    if not match:
-        return None
+    # Prefer values explicitly tied to RSSI labels.
+    labeled = re.search(r"rssi\s*[:=]\s*(-?\d+(?:\.\d+)?)", lowered)
+    if labeled:
+        try:
+            value = float(labeled.group(1))
+            if -120.0 <= value <= 20.0:
+                return value
+        except ValueError:
+            return None
 
-    try:
-        return float(match.group(1))
-    except ValueError:
-        return None
+    # Fallback: first realistic dBm-like negative number in the line.
+    match = re.search(r"(-\d+(?:\.\d+)?)", lowered)
+    if match:
+        try:
+            value = float(match.group(1))
+            if -120.0 <= value <= -20.0:
+                return value
+        except ValueError:
+            return None
+
+    return None
 
 
 async def read_serial_node(node_id: str, port_name: str) -> None:
