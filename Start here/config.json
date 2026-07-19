@@ -1,11 +1,12 @@
 {
   "environment": {
     "width_ft": 20,
-    "height_ft": 15
+    "height_ft": 10,
+    "ceiling_ft": 10
   },
   "sensitivity": {
-    "rssi_threshold_near": -60,
-    "rssi_threshold_mid": -80
+    "rssi_threshold_near": -72,
+    "rssi_threshold_mid": -87
   },
   "nodes": {
     "A": {
@@ -18,5 +19,12 @@
       "y": 0.05,
       "color": "#FFFF00"
     }
+  },
+  "ui_controls": {
+    "frequency_hz": 4,
+    "sensitivity_pct": 24,
+    "perimeter_ft": 11,
+    "accuracy_pct": 30,
+    "view_mode": "topside"
   }
 }

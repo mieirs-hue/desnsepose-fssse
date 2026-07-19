@@ -7,249 +7,267 @@
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body {
+            margin: 0;
+            min-height: 100vh;
             background: #000;
             color: #00ff41;
             font-family: 'Courier New', Courier, monospace;
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            padding: 12px;
+            overflow-x: hidden;
         }
-        /* ── Status bar ─────────────────────────────────────────────────── */
         #status-bar {
             width: 100%;
-            padding: 5px 14px;
-            font-size: 0.85em;
-            letter-spacing: 0.05em;
-            border-bottom: 1px solid #1a3a1a;
-            background: #020802;
-            flex-shrink: 0;
+            max-width: 1380px;
+            margin: 0 auto 10px;
+            padding: 7px 10px;
+            border: 1px solid #154f28;
+            background: #031006;
+            color: #ffae42;
+            letter-spacing: 0.04em;
+            font-size: 13px;
         }
-        /* ── Main layout ────────────────────────────────────────────────── */
         #main-layout {
+            width: 100%;
+            max-width: 1380px;
+            margin: 0 auto;
             display: flex;
-            flex: 1;
-            overflow: hidden;
+            gap: 12px;
+            align-items: stretch;
         }
-        /* ── View area ──────────────────────────────────────────────────── */
         #view-area {
             flex: 1;
+            min-width: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 8px;
-            overflow: hidden;
         }
         #view-switcher {
+            width: 100%;
             display: flex;
             gap: 6px;
             margin-bottom: 8px;
-            flex-shrink: 0;
         }
         .view-btn {
-            background: #0a0a0a;
-            color: #00ff41;
-            border: 1px solid #00ff41;
-            padding: 5px 16px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.8em;
+            border: 1px solid #1d8f45;
+            background: #04150a;
+            color: #9dffb8;
+            font-family: inherit;
+            padding: 8px 14px;
             cursor: pointer;
-            letter-spacing: 0.08em;
-            transition: background 0.2s, color 0.2s;
         }
-        .view-btn:hover { background: #0f2a0f; }
-        .view-btn.active { background: #00ff41; color: #000; font-weight: bold; }
-        /* ── Grid wrapper (TOP / ISO views) ─────────────────────────────── */
+        .view-btn.active {
+            background: #0d4721;
+            color: #e4ffee;
+            box-shadow: 0 0 12px rgba(0, 255, 100, 0.25);
+        }
         #grid-wrapper {
             position: relative;
-            transition: transform 0.6s ease;
-            transform-origin: center center;
+            width: min(100%, 980px);
         }
         #grid-container {
             position: relative;
+            width: 100%;
+            aspect-ratio: 2 / 1;
             border: 1px solid #00ff41;
+            overflow: hidden;
+            transform-origin: center center;
+            transition: transform 0.35s ease, box-shadow 0.25s ease;
+            background:
+                linear-gradient(rgba(0, 255, 65, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 65, 0.06) 1px, transparent 1px),
+                radial-gradient(circle at 50% 50%, rgba(0, 255, 65, 0.06), rgba(0, 0, 0, 0.95) 72%),
+                #000;
+            background-size: 10% 10%, 10% 10%, auto, auto;
         }
-        /* ── Polar view ─────────────────────────────────────────────────── */
-        #polar-view {
-            display: none;
-            align-items: center;
-            justify-content: center;
+        #grid-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at var(--occ-x, 50%) var(--occ-y, 50%), rgba(255, 30, 30, 0.30), rgba(255, 30, 30, 0.07) 46%, rgba(0, 0, 0, 0) 72%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 0;
         }
-        #polar-svg { display: block; }
-        /* ── Signal auras ───────────────────────────────────────────────── */
+        #grid-container.occupied {
+            box-shadow: 0 0 18px rgba(255, 45, 45, 0.35), inset 0 0 28px rgba(255, 40, 40, 0.15);
+        }
+        #grid-container.occupied::before {
+            animation: floor-alert 0.95s ease-in-out infinite;
+        }
+        #grid-container.view-top { transform: perspective(900px) rotateX(0deg) rotateZ(0deg); }
+        #grid-container.view-first { transform: perspective(900px) rotateX(56deg) rotateZ(-2deg) scale(1.02); }
+        #grid-container.view-iso { transform: perspective(1200px) rotateX(38deg) rotateZ(10deg) scale(0.97); }
         .signal-aura {
             position: absolute;
             border-radius: 50%;
-            transform: translate(-50%,-50%) scale(0.1);
+            transform: translate(-50%, -50%);
             opacity: 0;
-            transition: all 1.5s ease-out;
+            pointer-events: none;
+            z-index: 1;
+            transition: width 0.18s ease, height 0.18s ease, opacity 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
         }
         .node-label {
             position: absolute;
-            opacity: 0.85;
-            font-size: 0.75em;
+            transform: translate(-50%, -140%);
+            font-size: 12px;
             font-weight: bold;
-            transform: translate(-50%, calc(-50% - 14px));
-            text-shadow: 0 0 6px currentColor;
-            white-space: nowrap;
-            z-index: 10;
+            text-shadow: 0 0 8px currentColor;
+            z-index: 4;
         }
         .node-dot {
             position: absolute;
-            width: 10px; height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
-            transform: translate(-50%,-50%);
+            transform: translate(-50%, -50%);
             box-shadow: 0 0 10px currentColor;
-            z-index: 10;
+            z-index: 4;
         }
         #target-overlay {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
-            overflow: visible;
+            z-index: 5;
         }
-        .laser-beam    { stroke-width: 2; stroke-dasharray: 8 4; opacity: 0.85; }
-        .detection-zone {
-            fill: none; stroke-dasharray: 5 5;
-            opacity: 0.25; stroke-width: 1.5;
-            transition: opacity 0.3s, stroke-width 0.3s;
-        }
-        .detection-zone.triggered {
-            opacity: 0.9; stroke-width: 2.5;
-            animation: zone-flash 0.5s ease-in-out infinite alternate;
-        }
-        .bulls-eye-pulse {
-            fill: none; stroke: #ff3300; stroke-width: 2;
-            animation: reticle-pulse 1.1s ease-in-out infinite;
-            transform-box: fill-box; transform-origin: center;
-        }
+        .reticle-pulse { animation: reticle-pulse 1.15s ease-in-out infinite; }
         .target-name {
-            fill: #ff4500; font-family: 'Courier New', monospace;
-            font-size: 13px; font-weight: bold; text-anchor: middle;
+            fill: #ff592b;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 13px;
+            text-anchor: middle;
         }
-        @keyframes reticle-pulse {
-            0%,100% { opacity:1; stroke-width:2; }
-            50%      { opacity:0.3; stroke-width:3.5; }
-        }
-        @keyframes zone-flash {
-            from { opacity:0.6; } to { opacity:1.0; }
-        }
-        /* ── Side panel ─────────────────────────────────────────────────── */
         #side-panel {
-            width: 250px;
-            min-width: 250px;
-            background: #050505;
-            border-left: 1px solid #1a3a1a;
+            width: 340px;
+            border: 1px solid #00ff41;
+            background: linear-gradient(180deg, rgba(0, 26, 10, 0.96), rgba(0, 8, 4, 0.98));
+            padding: 10px;
             display: flex;
             flex-direction: column;
-            overflow-y: auto;
-            padding: 10px 12px;
-            gap: 12px;
-            font-size: 0.78em;
+            gap: 10px;
         }
         .sp-section {
-            border: 1px solid #1a3a1a;
-            padding: 8px 10px;
+            border: 1px solid #104d25;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.28);
         }
         .sp-title {
-            color: #00ff41;
-            font-size: 0.85em;
-            letter-spacing: 0.12em;
+            color: #b1ffca;
+            font-size: 13px;
             margin-bottom: 8px;
-            border-bottom: 1px solid #1a3a1a;
-            padding-bottom: 4px;
+            letter-spacing: 0.05em;
+        }
+        .sp-stat {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 3px 0;
+            font-size: 12px;
+        }
+        .sp-stat span {
+            color: #ffd7c7;
+            text-align: right;
         }
         .board-row {
-            display: flex;
-            align-items: center;
+            display: grid;
+            grid-template-columns: 14px 1fr auto;
             gap: 8px;
-            margin-bottom: 6px;
+            align-items: center;
+            padding: 4px 0;
         }
         .board-indicator {
-            width: 9px; height: 9px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            background: #333;
-            flex-shrink: 0;
-            box-shadow: 0 0 0px transparent;
-            transition: background 0.3s, box-shadow 0.3s;
+            background: #223;
         }
-        .board-indicator.online  { background:#00ff41; box-shadow:0 0 6px #00ff41; }
-        .board-indicator.offline { background:#ff3300; box-shadow:0 0 6px #ff3300; }
-        .board-info { flex: 1; }
-        .board-name { font-weight: bold; }
-        .board-detail { color: #666; margin-top: 2px; }
-        .board-rssi   { text-align: right; font-size: 1.1em; }
-        .sp-slider-row { margin-bottom: 8px; }
-        .sp-slider-row label {
-            display: flex; justify-content: space-between;
-            margin-bottom: 3px; color: #aaa;
+        .board-name {
+            font-size: 12px;
+            font-weight: bold;
         }
-        .sp-slider-row label span { color: #00ff41; }
-        input[type=range] {
+        .board-detail {
+            font-size: 11px;
+            color: #c0ffd6;
+        }
+        .board-rssi {
+            font-size: 12px;
+        }
+        .sp-slider-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        .sp-slider-row input {
             width: 100%;
             accent-color: #00ff41;
-            height: 4px;
         }
-        .sp-stat { display:flex; justify-content:space-between; margin-bottom:4px; color:#aaa; }
-        .sp-stat span { color:#00ff41; }
-        .sp-stat.alert span { color:#ff3300; }
-        .perimeter-bar {
-            position: relative;
-            height: 8px;
-            background: #111;
-            border: 1px solid #1a3a1a;
-            margin-top: 6px;
+        .mini-btn-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
         }
-        #perim-inner { position:absolute; top:0; left:0; height:100%; background:#00ff4155; }
-        #perim-outer { position:absolute; top:0; left:0; height:100%; border-right:2px solid #ff8c00; }
-        .perim-labels { display:flex; justify-content:space-between; color:#555; margin-top:3px; }
+        .mini-btn {
+            border: 1px solid #1d8f45;
+            background: #031209;
+            color: #c8ffdc;
+            font-family: inherit;
+            padding: 7px 8px;
+            text-align: left;
+            cursor: pointer;
+        }
+        #calibration-readout {
+            white-space: pre-wrap;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #d8fff4;
+            min-height: 64px;
+        }
+        @keyframes reticle-pulse {
+            0%, 100% { opacity: 1; stroke-width: 2; }
+            50% { opacity: 0.35; stroke-width: 3.6; }
+        }
+        @keyframes floor-alert {
+            0%, 100% { opacity: 0.24; }
+            50% { opacity: 0.58; }
+        }
+        @media (max-width: 1060px) {
+            #main-layout { flex-direction: column; }
+            #side-panel { width: 100%; }
+        }
     </style>
 </head>
 <body>
-    <div id="status-bar">Initialising...</div>
-
+    <div id="status-bar">Connecting...</div>
     <div id="main-layout">
-        <!-- ── View area ─────────────────────────────────── -->
         <div id="view-area">
             <div id="view-switcher">
-                <button id="btn-top"   class="view-btn active" onclick="setView('top')">⊡ TOP</button>
-                <button id="btn-polar" class="view-btn"        onclick="setView('polar')">◎ POLAR</button>
-                <button id="btn-iso"   class="view-btn"        onclick="setView('iso')">⬡ ISO</button>
+                <button id="btn-top" class="view-btn active">TOP</button>
+                <button id="btn-first" class="view-btn">JESSE POV</button>
+                <button id="btn-iso" class="view-btn">ISO</button>
             </div>
-
-            <!-- TOP + ISO view -->
             <div id="grid-wrapper">
-                <div id="grid-container"></div>
-            </div>
-
-            <!-- POLAR view -->
-            <div id="polar-view">
-                <svg id="polar-svg"></svg>
+                <div id="grid-container" class="view-top"></div>
             </div>
         </div>
 
-        <!-- ── Side panel ───────────────────────────────── -->
         <div id="side-panel">
-
-            <!-- Board telemetry -->
             <div class="sp-section">
-                <div class="sp-title">▸ BOARD TELEMETRY</div>
-
-                <div class="board-row" id="board-row-A">
+                <div class="sp-title">BOARD TELEMETRY</div>
+                <div class="board-row">
                     <div class="board-indicator" id="ind-A"></div>
-                    <div class="board-info">
+                    <div>
                         <div class="board-name" style="color:#00FFFF">ESP32-A</div>
                         <div class="board-detail" id="detail-A">Waiting...</div>
                     </div>
                     <div class="board-rssi" id="rssi-A" style="color:#00FFFF">—</div>
                 </div>
-
-                <div class="board-row" id="board-row-B">
+                <div class="board-row">
                     <div class="board-indicator" id="ind-B"></div>
-                    <div class="board-info">
+                    <div>
                         <div class="board-name" style="color:#FFFF00">ESP32-B</div>
                         <div class="board-detail" id="detail-B">Waiting...</div>
                     </div>
@@ -257,562 +275,578 @@
                 </div>
             </div>
 
-            <!-- Jesse position -->
             <div class="sp-section">
-                <div class="sp-title">▸ TARGET — JESSE</div>
+                <div class="sp-title">TARGET - JESSE</div>
                 <div class="sp-stat"><div>Position X</div><span id="sp-x">—</span></div>
                 <div class="sp-stat"><div>Position Y</div><span id="sp-y">—</span></div>
-                <div class="sp-stat"><div>Dist to A</div><span id="sp-dA">—</span></div>
-                <div class="sp-stat"><div>Dist to B</div><span id="sp-dB">—</span></div>
-                <div class="sp-stat" id="sp-mode-row"><div>Mode</div><span id="sp-mode">—</span></div>
+                <div class="sp-stat"><div>Signal Est A</div><span id="sp-dA">—</span></div>
+                <div class="sp-stat"><div>Signal Est B</div><span id="sp-dB">—</span></div>
+                <div class="sp-stat"><div>Confidence</div><span id="sp-confidence">—</span></div>
+                <div class="sp-stat"><div>Motion</div><span id="sp-motion">—</span></div>
+                <div class="sp-stat"><div>Mode</div><span id="sp-mode">—</span></div>
             </div>
 
-            <!-- Detection controls -->
             <div class="sp-section">
-                <div class="sp-title">▸ DETECTION ZONES</div>
-
+                <div class="sp-title">TRACK CONTROLS</div>
                 <div class="sp-slider-row">
-                    <label>Inner zone radius <span id="lbl-detect">10 ft</span></label>
-                    <input type="range" id="sl-detect" min="3" max="20" value="10" step="1"
-                           oninput="updateDetectRadius(+this.value)">
+                    <label>Frequency strength <span id="lbl-freq">10 Hz</span></label>
+                    <input type="range" id="sl-freq" min="1" max="20" value="10" step="1">
                 </div>
-
+                <div class="sp-slider-row">
+                    <label>Sensitivity <span id="lbl-sens">42%</span></label>
+                    <input type="range" id="sl-sens" min="10" max="100" value="42" step="1">
+                </div>
                 <div class="sp-slider-row">
                     <label>Outer perimeter <span id="lbl-outer">20 ft</span></label>
-                    <input type="range" id="sl-outer" min="10" max="30" value="20" step="1"
-                           oninput="updateOuterPerimeter(+this.value)">
+                    <input type="range" id="sl-outer" min="10" max="20" value="20" step="1">
                 </div>
-
-                <div class="perimeter-bar">
-                    <div id="perim-inner"></div>
-                    <div id="perim-outer"></div>
-                </div>
-                <div class="perim-labels"><span>0 ft</span><span id="perim-max">30 ft</span></div>
-            </div>
-
-            <!-- Signal sensitivity -->
-            <div class="sp-section">
-                <div class="sp-title">▸ SIGNAL SENSITIVITY</div>
                 <div class="sp-slider-row">
-                    <label>Path loss factor <span id="lbl-n">2.5</span></label>
-                    <input type="range" id="sl-n" min="1.5" max="4.0" value="2.5" step="0.1"
-                           oninput="updatePathLoss(+this.value)">
+                    <label>Motion accuracy <span id="lbl-acc">72%</span></label>
+                    <input type="range" id="sl-acc" min="10" max="100" value="72" step="1">
                 </div>
-                <div class="sp-stat"><div>RSSI floor</div><span>-90 dBm</span></div>
-                <div class="sp-stat"><div>RSSI ceiling</div><span>-40 dBm</span></div>
-                <div class="sp-stat"><div>1m reference</div><span>-59 dBm</span></div>
             </div>
 
-            <!-- System info -->
             <div class="sp-section">
-                <div class="sp-title">▸ SYSTEM</div>
-                <div class="sp-stat"><div>Boards active</div><span id="sp-boards">0/2</span></div>
+                <div class="sp-title">SYSTEM</div>
                 <div class="sp-stat"><div>Room</div><span id="sp-room">—</span></div>
+                <div class="sp-stat"><div>Boards active</div><span id="sp-boards">0/2</span></div>
                 <div class="sp-stat"><div>WS host</div><span id="sp-ws">—</span></div>
                 <div class="sp-stat"><div>View</div><span id="sp-view">TOP</span></div>
             </div>
 
+            <div class="sp-section">
+                <div class="sp-title">CALIBRATION CAPTURE</div>
+                <div class="mini-btn-grid">
+                    <button class="mini-btn" data-capture="front-left">Capture Front-left Edge</button>
+                    <button class="mini-btn" data-capture="center">Capture Center</button>
+                    <button class="mini-btn" data-capture="back-right">Capture Back-right Edge</button>
+                </div>
+                <div id="calibration-readout">No calibration captures yet.</div>
+            </div>
         </div>
     </div>
 
     <script>
-        // ── DOM refs ─────────────────────────────────────────────────────────
-        const statusBar    = document.getElementById('status-bar');
-        const gridContainer= document.getElementById('grid-container');
-        const gridWrapper  = document.getElementById('grid-wrapper');
-        const polarView    = document.getElementById('polar-view');
-        const polarSvg     = document.getElementById('polar-svg');
+        const statusBar = document.getElementById('status-bar');
+        const gridContainer = document.getElementById('grid-container');
 
-        // ── State ─────────────────────────────────────────────────────────────
-        let officeWidthFt, officeHeightFt, nodeConfig;
+        const btnTop = document.getElementById('btn-top');
+        const btnFirst = document.getElementById('btn-first');
+        const btnIso = document.getElementById('btn-iso');
+
+        const detailA = document.getElementById('detail-A');
+        const detailB = document.getElementById('detail-B');
+        const rssiAEl = document.getElementById('rssi-A');
+        const rssiBEl = document.getElementById('rssi-B');
+        const indA = document.getElementById('ind-A');
+        const indB = document.getElementById('ind-B');
+
+        const spX = document.getElementById('sp-x');
+        const spY = document.getElementById('sp-y');
+        const spDA = document.getElementById('sp-dA');
+        const spDB = document.getElementById('sp-dB');
+        const spConfidence = document.getElementById('sp-confidence');
+        const spMotion = document.getElementById('sp-motion');
+        const spMode = document.getElementById('sp-mode');
+        const spRoom = document.getElementById('sp-room');
+        const spBoards = document.getElementById('sp-boards');
+        const spWs = document.getElementById('sp-ws');
+        const spView = document.getElementById('sp-view');
+
+        const slFreq = document.getElementById('sl-freq');
+        const slSens = document.getElementById('sl-sens');
+        const slOuter = document.getElementById('sl-outer');
+        const slAcc = document.getElementById('sl-acc');
+        const lblFreq = document.getElementById('lbl-freq');
+        const lblSens = document.getElementById('lbl-sens');
+        const lblOuter = document.getElementById('lbl-outer');
+        const lblAcc = document.getElementById('lbl-acc');
+
+        const captureButtons = [...document.querySelectorAll('[data-capture]')];
+        const calibrationReadout = document.getElementById('calibration-readout');
+
+        let officeWidthFt = 20;
+        let officeHeightFt = 10;
+        let officeCeilingFt = 10;
+        let nodeConfig = {};
         const nodeReadings = {};
-        let svgEl  = null;
-        let svgW = 0, svgH = 0;
+        const liveAuras = {};
+        const calibrationSnapshots = { 'front-left': null, 'center': null, 'back-right': null };
+
+        let svgEl = null;
         let currentView = 'top';
-        let currentTx = 0.5, currentTy = 0.5;
-        let pathLossN  = 2.5;
-        let DETECT_FT  = 10;
-        let OUTER_FT   = 20;
-        const TRAIL_INTERVAL = 350;
-        const TRAIL_LIFE_MS  = 9000;
-        let lastTrailTs = 0;
+        let lastTargetNorm = { x: 0.5, y: 0.5 };
+        let occupiedUntilMs = 0;
+        let lastSignalSnapshot = { A: null, B: null };
+        let saveTimer = null;
 
-        // ── Signal model ─────────────────────────────────────────────────────
+        const OCCUPIED_HOLD_MS = 3200;
+        const controlState = {
+            frequencyHz: 10,
+            sensitivityPct: 42,
+            perimeterFt: 20,
+            accuracyPct: 72,
+        };
+
+        function getReadingTtlMs() {
+            return Math.round(4000 - (controlState.frequencyHz - 1) * 150);
+        }
+
+        function getOccupiedStrengthMin() {
+            return Math.max(0.08, 0.58 - (controlState.sensitivityPct / 100) * 0.5);
+        }
+
+        function getSmoothingAlpha(activeCount) {
+            const baseAlpha = activeCount >= 2 ? 0.86 : 0.56;
+            const adjustment = ((controlState.accuracyPct / 100) - 0.5) * 0.12;
+            return Math.max(0.45, Math.min(0.94, baseAlpha + adjustment));
+        }
+
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
         function rssiToFeet(rssi) {
-            return Math.pow(10, (-59 - rssi) / (10 * pathLossN)) * 3.28084;
+            const txPower = -67;
+            const n = 3.6;
+            return Math.pow(10, (txPower - rssi) / (10 * n)) * 3.28084;
         }
 
-        // ── View switching ────────────────────────────────────────────────────
-        function setView(v) {
-            currentView = v;
-            ['top','polar','iso'].forEach(n => {
-                document.getElementById(`btn-${n}`).classList.toggle('active', n === v);
-            });
-            document.getElementById('sp-view').textContent = v.toUpperCase();
+        function projectToFloorDistance(distance3dFt) {
+            const vertical = 4;
+            if (distance3dFt <= vertical) return 0.25;
+            return Math.sqrt((distance3dFt * distance3dFt) - (vertical * vertical));
+        }
 
-            if (v === 'polar') {
-                gridWrapper.style.display = 'none';
-                polarView.style.display   = 'flex';
-                drawPolarView(currentTx, currentTy);
-            } else {
-                gridWrapper.style.display = 'block';
-                polarView.style.display   = 'none';
-                if (v === 'iso') {
-                    gridWrapper.style.transform =
-                        'perspective(700px) rotateX(48deg) rotateZ(-12deg) scale(0.82)';
+        function estimateConfidence(strengthA, strengthB) {
+            const presence = Math.max(strengthA || 0, strengthB || 0);
+            const balance = 1 - Math.min(1, Math.abs((strengthA || 0) - (strengthB || 0)) * 1.15);
+            return Math.max(0.08, Math.min(0.97, 0.60 * presence + 0.40 * balance));
+        }
+
+        function ensureSignalAura(nodeId, node, color) {
+            if (liveAuras[nodeId]) return liveAuras[nodeId];
+            const aura = document.createElement('div');
+            aura.className = 'signal-aura';
+            aura.style.left = `${node.x * 100}%`;
+            aura.style.top = `${node.y * 100}%`;
+            aura.style.width = '10%';
+            aura.style.height = '10%';
+            aura.style.backgroundColor = hexToRgba(color, 0.08);
+            aura.style.border = `1px solid ${hexToRgba(color, 0.24)}`;
+            gridContainer.appendChild(aura);
+            liveAuras[nodeId] = aura;
+            return aura;
+        }
+
+        function updateSignalAura(nodeId, node, radius, opacity, color) {
+            const aura = ensureSignalAura(nodeId, node, color);
+            aura.style.width = `${2 * radius * 100}%`;
+            aura.style.height = `${2 * radius * 100}%`;
+            aura.style.opacity = String(opacity);
+            aura.style.backgroundColor = hexToRgba(color, 0.12 + opacity * 0.18);
+            aura.style.border = `1px solid ${hexToRgba(color, 0.26 + opacity * 0.38)}`;
+        }
+
+        function fadeStaleSignalAuras() {
+            const now = Date.now();
+            for (const [nodeId, aura] of Object.entries(liveAuras)) {
+                const reading = nodeReadings[nodeId];
+                const freshness = reading ? 1 - Math.min(1, (now - reading.ts) / getReadingTtlMs()) : 0;
+                aura.style.opacity = String(Math.max(0.04, freshness * 0.65));
+            }
+        }
+
+        function setView(view) {
+            currentView = view;
+            btnTop.classList.toggle('active', view === 'top');
+            btnFirst.classList.toggle('active', view === 'first');
+            btnIso.classList.toggle('active', view === 'iso');
+            gridContainer.className = view === 'top' ? 'view-top' : view === 'first' ? 'view-first' : 'view-iso';
+            spView.textContent = view.toUpperCase();
+        }
+
+        function scheduleControlSave() {
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                persistControls().catch((err) => console.warn('persist failed', err));
+            }, 180);
+        }
+
+        function refreshControlLabels() {
+            lblFreq.textContent = `${controlState.frequencyHz} Hz`;
+            lblSens.textContent = `${controlState.sensitivityPct}%`;
+            lblOuter.textContent = `${controlState.perimeterFt} ft`;
+            lblAcc.textContent = `${controlState.accuracyPct}%`;
+        }
+
+        function renderCalibrationReadout() {
+            const labels = [['front-left', 'Front-left'], ['center', 'Center'], ['back-right', 'Back-right']];
+            const lines = [];
+            for (const [key, label] of labels) {
+                const snap = calibrationSnapshots[key];
+                if (!snap) {
+                    lines.push(`${label}: --`);
+                    continue;
+                }
+                lines.push(`${label}: X ${snap.x.toFixed(1)} | Y ${snap.y.toFixed(1)} | A ${snap.a == null ? '--' : snap.a.toFixed(1)} | B ${snap.b == null ? '--' : snap.b.toFixed(1)} | ${snap.time}`);
+            }
+            calibrationReadout.textContent = lines.join('\n');
+        }
+
+        function updateBoardTelemetry(activeIds) {
+            const detailEls = { A: detailA, B: detailB };
+            const rssiEls = { A: rssiAEl, B: rssiBEl };
+            const inds = { A: indA, B: indB };
+            let activeCount = 0;
+
+            for (const id of Object.keys(nodeConfig || {})) {
+                const reading = nodeReadings[id];
+                const active = activeIds.includes(id);
+                if (active) activeCount += 1;
+                inds[id].style.background = active ? (nodeConfig[id].color || '#00ff41') : '#223';
+                inds[id].style.boxShadow = active ? `0 0 10px ${nodeConfig[id].color || '#00ff41'}` : 'none';
+                if (!reading || !active) {
+                    detailEls[id].textContent = 'Waiting...';
+                    rssiEls[id].textContent = '—';
                 } else {
-                    gridWrapper.style.transform = '';
+                    const estimate = Math.min(projectToFloorDistance(rssiToFeet(reading.rssi)), controlState.perimeterFt);
+                    detailEls[id].textContent = `signal est ${estimate.toFixed(1)} ft`;
+                    rssiEls[id].textContent = `${reading.rssi} dBm`;
                 }
             }
+            spBoards.textContent = `${activeCount}/${Object.keys(nodeConfig || {}).length}`;
         }
 
-        // ── Slider callbacks ──────────────────────────────────────────────────
-        function updateDetectRadius(val) {
-            DETECT_FT = val;
-            document.getElementById('lbl-detect').textContent = val + ' ft';
-            resizeZone('inner', val);
-            updatePerimBar();
+        function solveDirectionalTarget(idA, idB, strengthA, strengthB) {
+            const nodeA = nodeConfig[idA];
+            const nodeB = nodeConfig[idB];
+            const diff = strengthB - strengthA;
+            const dominance = Math.max(-1, Math.min(1, diff * 2.6));
+            const axisT = (dominance + 1) / 2;
+            const towardB = 0.08 + axisT * 0.84;
+            const x = nodeA.x + (nodeB.x - nodeA.x) * towardB;
+            const y = nodeA.y + (nodeB.y - nodeA.y) * towardB;
+            return {
+                x: Math.max(0.04, Math.min(0.96, x)),
+                y: Math.max(0.06, Math.min(0.94, y)),
+                dominance,
+            };
         }
 
-        function updateOuterPerimeter(val) {
-            OUTER_FT = val;
-            document.getElementById('lbl-outer').textContent = val + ' ft';
-            resizeZone('outer', val);
-            updatePerimBar();
-        }
-
-        function updatePathLoss(val) {
-            pathLossN = val;
-            document.getElementById('lbl-n').textContent = val.toFixed(1);
-        }
-
-        function resizeZone(which, ft) {
-            if (!svgEl || !nodeConfig) return;
-            const rxF = ft / officeWidthFt;
-            const ryF = ft / officeHeightFt;
-            document.querySelectorAll(`.${which}-zone`).forEach(el => {
-                el.setAttribute('rx', rxF * svgW);
-                el.setAttribute('ry', ryF * svgH);
-            });
-        }
-
-        function updatePerimBar() {
-            const maxFt = 30;
-            document.getElementById('perim-inner').style.width =
-                (DETECT_FT / maxFt * 100) + '%';
-            document.getElementById('perim-outer').style.width =
-                (OUTER_FT  / maxFt * 100) + '%';
-        }
-
-        // ── Side panel updates ────────────────────────────────────────────────
-        function updateSidePanel(tx, ty, avail, detections) {
-            const W = officeWidthFt, H = officeHeightFt;
-            document.getElementById('sp-x').textContent =
-                (tx * W).toFixed(1) + ' ft';
-            document.getElementById('sp-y').textContent =
-                (ty * H).toFixed(1) + ' ft';
-            document.getElementById('sp-boards').textContent =
-                avail.length + '/2';
-
-            const ids = Object.keys(nodeConfig || {});
-            ids.forEach(id => {
-                const r = nodeReadings[id];
-                const ind = document.getElementById(`ind-${id}`);
-                const det = document.getElementById(`detail-${id}`);
-                const rs  = document.getElementById(`rssi-${id}`);
-                const spD = document.getElementById(`sp-d${id}`);
-                if (r) {
-                    ind.className = 'board-indicator online';
-                    const dist = rssiToFeet(r.rssi);
-                    det.textContent = dist.toFixed(1) + ' ft away';
-                    rs.textContent  = r.rssi + ' dBm';
-                    if (spD) spD.textContent = dist.toFixed(1) + ' ft';
-                } else {
-                    ind.className = 'board-indicator offline';
-                    det.textContent = 'No signal';
-                    rs.textContent  = '—';
-                    if (spD) spD.textContent = '—';
-                }
-            });
-
-            const modeEl = document.getElementById('sp-mode');
-            modeEl.textContent = avail.length >= 2 ? 'DUAL-TRILATERATION' : 'SINGLE-BOARD';
-            modeEl.parentElement.classList.toggle('alert', avail.length < 2);
-        }
-
-        // ── Helpers ───────────────────────────────────────────────────────────
-        function hexToRgba(hex, a) {
-            return `rgba(${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)},${a})`;
-        }
-
-        function circleIntersect(x1,y1,r1,x2,y2,r2) {
-            const dx=x2-x1, dy=y2-y1, d=Math.sqrt(dx*dx+dy*dy);
-            if (d>r1+r2+0.1||d<Math.abs(r1-r2)-0.1||d<0.01) return null;
-            const a=(r1*r1-r2*r2+d*d)/(2*d), h=Math.sqrt(Math.max(0,r1*r1-a*a));
-            const mx=x1+a*dx/d, my=y1+a*dy/d;
-            return [{x:mx+h*dy/d,y:my-h*dx/d},{x:mx-h*dy/d,y:my+h*dx/d}];
-        }
-
-        function jesseDist(tx, ty, node) {
-            const dx=(tx-node.x)*officeWidthFt, dy=(ty-node.y)*officeHeightFt;
-            return Math.sqrt(dx*dx+dy*dy);
-        }
-
-        const ns = 'http://www.w3.org/2000/svg';
-        function mkEl(tag, attrs) {
-            const el = document.createElementNS(ns, tag);
-            Object.entries(attrs||{}).forEach(([k,v])=>el.setAttribute(k,v));
-            return el;
-        }
-
-        // ── Trail ─────────────────────────────────────────────────────────────
-        function dropTrailDot(tx, ty, detected) {
-            const trailGroup = svgEl && svgEl.querySelector('#trail-group');
-            if (!trailGroup || currentView === 'polar') return;
-            const dot = mkEl('circle',{
-                cx: tx*svgW, cy: ty*svgH,
-                r: detected ? '7' : '5'
-            });
-            dot.style.fill    = detected ? '#ff3300' : '#00cfff';
-            dot.style.opacity = '0.75';
-            dot.style.filter  = detected
-                ? 'drop-shadow(0 0 4px #ff3300)'
-                : 'drop-shadow(0 0 3px #00cfff)';
-            trailGroup.appendChild(dot);
-            setTimeout(()=>{ dot.style.transition=`opacity ${TRAIL_LIFE_MS/1000}s linear`; dot.style.opacity='0'; },80);
-            setTimeout(()=>dot.remove(), TRAIL_LIFE_MS+200);
-        }
-
-        // ── Polar view ────────────────────────────────────────────────────────
-        function drawPolarView(tx, ty) {
-            const size = Math.min(svgW, svgH) * 1.05;
-            polarSvg.setAttribute('width', size);
-            polarSvg.setAttribute('height', size);
-            while (polarSvg.firstChild) polarSvg.removeChild(polarSvg.firstChild);
-
-            const cx = size/2, cy = size/2;
-            const maxRingFt = Math.max(OUTER_FT, 20);
-            const scale = (size/2 - 20) / maxRingFt;
-
-            // Range rings
-            [5, 10, 15, 20, 25].filter(r=>r<=maxRingFt+5).forEach(r => {
-                const ring = mkEl('circle',{cx,cy,r:r*scale,fill:'none',
-                    stroke: r===DETECT_FT ? '#00ff41' : r===OUTER_FT ? '#ff8c00' : '#1a3a1a',
-                    'stroke-width': r===DETECT_FT||r===OUTER_FT ? '1.5' : '1',
-                    'stroke-dasharray': '3 4'
-                });
-                polarSvg.appendChild(ring);
-                const lbl = mkEl('text',{x:cx+r*scale+3,y:cy-3,fill:'#444',
-                    'font-size':'10','font-family':'Courier New'});
-                lbl.textContent = r+'ft';
-                polarSvg.appendChild(lbl);
-            });
-
-            // Cross-hairs
-            [mkEl('line',{x1:cx,y1:15,x2:cx,y2:size-15,stroke:'#1a3a1a','stroke-width':'1'}),
-             mkEl('line',{x1:15,y1:cy,x2:size-15,y2:cy,stroke:'#1a3a1a','stroke-width':'1'})
-            ].forEach(l=>polarSvg.appendChild(l));
-
-            // N/S/E/W labels
-            [['N',cx-4,18],['S',cx-4,size-8],['E',size-10,cy+4],['W',8,cy+4]].forEach(([t,x,y])=>{
-                const lbl=mkEl('text',{x,y,fill:'#2a5a2a','font-size':'11','font-family':'Courier New'});
-                lbl.textContent=t; polarSvg.appendChild(lbl);
-            });
-
-            // Boards in polar space
-            if (nodeConfig) {
-                Object.entries(nodeConfig).forEach(([nodeId, nodeInfo]) => {
-                    const dx = (nodeInfo.x - tx) * officeWidthFt;
-                    const dy = (nodeInfo.y - ty) * officeHeightFt;
-                    const dist = Math.sqrt(dx*dx+dy*dy);
-                    const angle = Math.atan2(dy, dx);
-                    const r = Math.min(dist, maxRingFt);
-                    const bx = cx + r*scale*Math.cos(angle);
-                    const by = cy + r*scale*Math.sin(angle);
-
-                    // Line from Jesse to board
-                    const line = mkEl('line',{x1:cx,y1:cy,x2:bx,y2:by,
-                        stroke:nodeInfo.color||'#00ff41','stroke-width':'1.5',
-                        'stroke-dasharray':'6 3',opacity:'0.6'});
-                    polarSvg.appendChild(line);
-
-                    const online = !!nodeReadings[nodeId];
-                    const dot = mkEl('circle',{cx:bx,cy:by,r:'9',
-                        fill:online?nodeInfo.color||'#00ff41':'#333',
-                        stroke:nodeInfo.color||'#00ff41','stroke-width':'1'});
-                    polarSvg.appendChild(dot);
-
-                    const nameLbl = mkEl('text',{x:bx,y:by-14,fill:nodeInfo.color||'#00ff41',
-                        'font-size':'11','font-family':'Courier New','text-anchor':'middle'});
-                    nameLbl.textContent = `ESP32-${nodeId}`;
-                    polarSvg.appendChild(nameLbl);
-
-                    const distLbl = mkEl('text',{x:bx,y:by+20,fill:nodeInfo.color||'#00ff41',
-                        'font-size':'10','font-family':'Courier New','text-anchor':'middle',opacity:'0.7'});
-                    distLbl.textContent = dist.toFixed(1)+' ft';
-                    polarSvg.appendChild(distLbl);
-                });
-            }
-
-            // Jesse at centre
-            const g = mkEl('g');
-            g.appendChild(mkEl('circle',{cx,cy,r:'20',fill:'none',stroke:'#ff3300',
-                'stroke-width':'2',class:'bulls-eye-pulse'}));
-            g.appendChild(mkEl('circle',{cx,cy,r:'10',fill:'none',stroke:'#ff3300','stroke-width':'1.5'}));
-            g.appendChild(mkEl('circle',{cx,cy,r:'4',fill:'#ff3300'}));
-            // Crosshair arms
-            [[cx-34,cy,cx-14,cy],[cx+14,cy,cx+34,cy],[cx,cy-34,cx,cy-14],[cx,cy+14,cx,cy+34]]
-                .forEach(([x1,y1,x2,y2])=>{
-                    g.appendChild(mkEl('line',{x1,y1,x2,y2,stroke:'#ff3300','stroke-width':'2'}));
-                });
-            const jLbl = mkEl('text',{x:cx,y:cy-30,fill:'#ff4500','font-size':'13',
-                'font-family':'Courier New','font-weight':'bold','text-anchor':'middle'});
-            jLbl.textContent='[ JESSE ]'; g.appendChild(jLbl);
-            polarSvg.appendChild(g);
-        }
-
-        // ── Localisation ──────────────────────────────────────────────────────
-        function updateTarget() {
-            const ids   = Object.keys(nodeConfig||{});
-            const avail = ids.filter(id=>nodeReadings[id]);
-            if (avail.length===0||!svgEl) return;
-
-            const nA=nodeConfig[ids[0]], nB=nodeConfig[ids[1]];
-            const W=officeWidthFt, H=officeHeightFt;
-            let tx,ty;
-
-            if (avail.length>=2) {
-                const ax=nA.x*W,ay=nA.y*H,bx=nB.x*W,by=nB.y*H;
-                const dA=rssiToFeet(nodeReadings[ids[0]].rssi);
-                const dB=rssiToFeet(nodeReadings[ids[1]].rssi);
-                let target;
-                const pts=circleIntersect(ax,ay,dA,bx,by,dB);
-                if (pts) {
-                    const cx=W/2,cy=H/2;
-                    target=pts.reduce((b,p)=>Math.hypot(p.x-cx,p.y-cy)<Math.hypot(b.x-cx,b.y-cy)?p:b);
-                } else {
-                    const sA=nodeReadings[ids[0]].strength,sB=nodeReadings[ids[1]].strength,tw=sA+sB||1;
-                    target={x:(ax*sA+bx*sB)/tw,y:(ay*sA+by*sB)/tw};
-                }
-                target.x=Math.max(0,Math.min(W,target.x));
-                target.y=Math.max(0,Math.min(H,target.y));
-                tx=target.x/W; ty=target.y/H;
-            } else {
-                const id=avail[0],node=nodeConfig[id];
-                const dist=rssiToFeet(nodeReadings[id].rssi);
-                const diag=Math.sqrt(W*W+H*H);
-                const oppX=node.x<0.5?0.95:0.05,oppY=node.y<0.5?0.95:0.05;
-                const t=Math.min(dist/diag,1.0);
-                tx=node.x+(oppX-node.x)*t; ty=node.y+(oppY-node.y)*t;
-            }
-
-            currentTx=tx; currentTy=ty;
-
-            // Detection
-            const detections=[];
-            for (const [nodeId,nodeInfo] of Object.entries(nodeConfig)) {
-                const dist=jesseDist(tx,ty,nodeInfo);
-                const zEl=svgEl.querySelector(`#zone-inner-${nodeId}`);
-                if (zEl) {
-                    const hit=dist<=DETECT_FT;
-                    zEl.setAttribute('stroke',hit?'#ff0000':nodeInfo.color||'#00ff41');
-                    zEl.classList.toggle('triggered',hit);
-                    if (hit) detections.push(`Board ${nodeId} (${dist.toFixed(1)} ft)`);
-                }
-            }
-
-            if (detections.length>0) {
-                statusBar.textContent=`⚠  JESSE DETECTED — within ${DETECT_FT} ft of ${detections.join(' · ')}`;
-                statusBar.style.color='#ff0000';
-            } else {
-                statusBar.textContent=
-                    `LIVE — Jesse at (${(tx*W).toFixed(1)} ft, ${(ty*H).toFixed(1)} ft)` +
-                    `  ·  ${avail.length}/2 boards  ·  ${avail.length>=2?'DUAL-TRILAT':'SINGLE-BOARD'}`;
-                statusBar.style.color=avail.length>=2?'#00ff41':'#ff8c00';
-            }
-
-            updateSidePanel(tx,ty,avail,detections);
-
-            const now=Date.now();
-            if (now-lastTrailTs>=TRAIL_INTERVAL) {
-                dropTrailDot(tx,ty,detections.length>0);
-                lastTrailTs=now;
-            }
-
-            if (currentView==='polar') drawPolarView(tx,ty);
-            else drawTarget(tx,ty,nA,nB);
-        }
-
-        function drawTarget(tx,ty,nA,nB) {
-            const old=svgEl.querySelector('#target-group');
+        function drawTarget(tx, ty, motionDetected) {
+            const old = svgEl.querySelector('#target-group');
             if (old) old.remove();
-            const px=tx*svgW,py=ty*svgH;
-            const g=mkEl('g'); g.id='target-group';
 
-            [nA,nB].forEach(nCfg=>{
-                if (!nCfg) return;
-                const l=mkEl('line',{
-                    x1:nCfg.x*svgW,y1:nCfg.y*svgH,x2:px,y2:py,
-                    stroke:nCfg.color||'#00ff41',class:'laser-beam',filter:'url(#laser-glow)'});
-                g.appendChild(l);
-            });
+            const widthPx = svgEl.clientWidth || gridContainer.clientWidth;
+            const heightPx = svgEl.clientHeight || gridContainer.clientHeight;
+            const px = tx * widthPx;
+            const py = ty * heightPx;
+            const ns = 'http://www.w3.org/2000/svg';
+            const g = document.createElementNS(ns, 'g');
+            g.id = 'target-group';
 
-            g.appendChild(mkEl('circle',{cx:px,cy:py,r:'22',class:'bulls-eye-pulse'}));
-            g.appendChild(mkEl('circle',{cx:px,cy:py,r:'13',fill:'none',stroke:'#ff3300','stroke-width':'1.5'}));
-            g.appendChild(mkEl('circle',{cx:px,cy:py,r:'4',fill:'#ff3300'}));
+            const outer = document.createElementNS(ns, 'circle');
+            outer.setAttribute('cx', px);
+            outer.setAttribute('cy', py);
+            outer.setAttribute('r', '22');
+            outer.setAttribute('fill', 'none');
+            outer.setAttribute('stroke', '#ff592b');
+            outer.setAttribute('stroke-width', '2');
+            if (motionDetected) outer.setAttribute('class', 'reticle-pulse');
+            g.appendChild(outer);
 
-            [[px-38,py,px-16,py],[px+16,py,px+38,py],[px,py-38,px,py-16],[px,py+16,px,py+38]]
-                .forEach(([x1,y1,x2,y2])=>{
-                    g.appendChild(mkEl('line',{x1,y1,x2,y2,stroke:'#ff3300','stroke-width':'2'}));
-                });
+            const middle = document.createElementNS(ns, 'circle');
+            middle.setAttribute('cx', px);
+            middle.setAttribute('cy', py);
+            middle.setAttribute('r', '13');
+            middle.setAttribute('fill', 'none');
+            middle.setAttribute('stroke', '#ff592b');
+            middle.setAttribute('stroke-width', '1.5');
+            g.appendChild(middle);
 
-            const lbl=mkEl('text',{x:px,y:py-34,class:'target-name'});
-            lbl.textContent='[ JESSE ]'; g.appendChild(lbl);
+            const center = document.createElementNS(ns, 'circle');
+            center.setAttribute('cx', px);
+            center.setAttribute('cy', py);
+            center.setAttribute('r', '4');
+            center.setAttribute('fill', '#ff592b');
+            g.appendChild(center);
+
+            for (const [x1, y1, x2, y2] of [
+                [px - 34, py, px - 14, py],
+                [px + 14, py, px + 34, py],
+                [px, py - 34, px, py - 14],
+                [px, py + 14, px, py + 34],
+            ]) {
+                const seg = document.createElementNS(ns, 'line');
+                seg.setAttribute('x1', x1);
+                seg.setAttribute('y1', y1);
+                seg.setAttribute('x2', x2);
+                seg.setAttribute('y2', y2);
+                seg.setAttribute('stroke', '#ff592b');
+                seg.setAttribute('stroke-width', '2');
+                g.appendChild(seg);
+            }
+
+            const label = document.createElementNS(ns, 'text');
+            label.setAttribute('x', px);
+            label.setAttribute('y', py - 30);
+            label.setAttribute('class', 'target-name');
+            label.textContent = '[ JESSE ]';
+            g.appendChild(label);
+
             svgEl.appendChild(g);
         }
 
-        // ── Motion event ──────────────────────────────────────────────────────
-        function handleMotionEvent(ev) {
-            const data=JSON.parse(ev.data);
-            const node=nodeConfig[data.node_id];
+        function updateTarget() {
+            const ids = Object.keys(nodeConfig || {});
+            if (!svgEl || ids.length === 0) return;
+
+            const now = Date.now();
+            const activeIds = ids.filter((id) => {
+                const reading = nodeReadings[id];
+                return reading && (now - reading.ts) <= getReadingTtlMs();
+            });
+            updateBoardTelemetry(activeIds);
+
+            let maxStrength = 0;
+            for (const id of activeIds) maxStrength = Math.max(maxStrength, nodeReadings[id]?.strength || 0);
+            if (activeIds.length > 0 && maxStrength >= getOccupiedStrengthMin()) occupiedUntilMs = now + OCCUPIED_HOLD_MS;
+            gridContainer.classList.toggle('occupied', now <= occupiedUntilMs);
+
+            if (activeIds.length === 0) {
+                statusBar.textContent = 'No live sensor data. Waiting for boards...';
+                statusBar.style.color = '#ff4040';
+                const old = svgEl.querySelector('#target-group');
+                if (old) old.remove();
+                spMode.textContent = 'NO LOCK';
+                spMotion.textContent = 'HOLDING';
+                return;
+            }
+
+            let tx = lastTargetNorm.x;
+            let ty = lastTargetNorm.y;
+            let estimateA = null;
+            let estimateB = null;
+            let confidence = 0.12;
+            let motionDetected = false;
+            let mode = 'SINGLE-ANCHOR';
+            let signalDeltaDbm = 0;
+
+            if (activeIds.length >= 2) {
+                const [idA, idB] = [...activeIds].sort((a, b) => (nodeReadings[b].strength || 0) - (nodeReadings[a].strength || 0)).slice(0, 2);
+                const rssiA = nodeReadings[idA].rssi;
+                const rssiB = nodeReadings[idB].rssi;
+                const strengthA = nodeReadings[idA].strength || 0;
+                const strengthB = nodeReadings[idB].strength || 0;
+
+                estimateA = Math.min(projectToFloorDistance(rssiToFeet(rssiA)), controlState.perimeterFt);
+                estimateB = Math.min(projectToFloorDistance(rssiToFeet(rssiB)), controlState.perimeterFt);
+
+                const directional = solveDirectionalTarget(idA, idB, strengthA, strengthB);
+                tx = directional.x;
+                ty = directional.y;
+
+                confidence = estimateConfidence(strengthA, strengthB);
+                signalDeltaDbm = Math.max(
+                    lastSignalSnapshot.A == null ? 0 : Math.abs(rssiA - lastSignalSnapshot.A),
+                    lastSignalSnapshot.B == null ? 0 : Math.abs(rssiB - lastSignalSnapshot.B)
+                );
+                lastSignalSnapshot = { A: rssiA, B: rssiB };
+                mode = `DUAL-SIGNAL TRACK (${directional.dominance >= 0 ? 'B' : 'A'} BIAS)`;
+                statusBar.textContent = `LIVE FEED: Dual-board directional track (${idA}+${idB})`;
+                statusBar.style.color = '#00ff41';
+            } else {
+                const id = activeIds[0];
+                const node = nodeConfig[id];
+                const reading = nodeReadings[id];
+                const estimate = Math.min(projectToFloorDistance(rssiToFeet(reading.rssi)), controlState.perimeterFt);
+                if (id === 'A') estimateA = estimate;
+                if (id === 'B') estimateB = estimate;
+                signalDeltaDbm = Math.abs(reading.rssi - (lastSignalSnapshot[id] ?? reading.rssi));
+                lastSignalSnapshot[id] = reading.rssi;
+                confidence = Math.max(0.12, (reading.strength || 0) * 0.72);
+                tx = node.x;
+                ty = node.y;
+                mode = `SINGLE-${id}`;
+                statusBar.textContent = `LIVE FEED: Single-board anchor hold (${id})`;
+                statusBar.style.color = '#ff9d36';
+            }
+
+            motionDetected = signalDeltaDbm >= 1.0 || activeIds.length === 1;
+
+            const alpha = getSmoothingAlpha(activeIds.length);
+            tx = alpha * tx + (1 - alpha) * lastTargetNorm.x;
+            ty = alpha * ty + (1 - alpha) * lastTargetNorm.y;
+            lastTargetNorm = { x: tx, y: ty };
+
+            gridContainer.style.setProperty('--occ-x', `${(tx * 100).toFixed(1)}%`);
+            gridContainer.style.setProperty('--occ-y', `${(ty * 100).toFixed(1)}%`);
+
+            spX.textContent = `${(tx * officeWidthFt).toFixed(1)} ft`;
+            spY.textContent = `${(ty * officeHeightFt).toFixed(1)} ft`;
+            spDA.textContent = estimateA == null ? '—' : `${estimateA.toFixed(1)} ft`;
+            spDB.textContent = estimateB == null ? '—' : `${estimateB.toFixed(1)} ft`;
+            spConfidence.textContent = `${Math.round(confidence * 100)}%`;
+            spMotion.textContent = motionDetected ? 'DETECTED' : 'HOLDING';
+            spMode.textContent = mode;
+
+            drawTarget(tx, ty, motionDetected);
+        }
+
+        function handleMotionEvent(event) {
+            const data = JSON.parse(event.data);
+            const node = nodeConfig[data.node_id];
             if (!node) return;
-            const rssi=data.rssi,rssiMin=-90,rssiMax=-40;
-            let strength=(rssi-rssiMin)/(rssiMax-rssiMin);
-            strength=Math.max(0,Math.min(1,strength));
-            createSignalAura(node,0.1+(1-strength)*0.9,0.1+strength*0.6);
-            nodeReadings[data.node_id]={rssi,strength};
+
+            const rssi = data.rssi;
+            const strength = Math.max(0, Math.min(1, (rssi + 90) / 50));
+            const distanceFactor = 1 - strength;
+            const radius = 0.18 + distanceFactor * 1.25;
+            const opacity = 0.14 + strength * 0.56;
+
+            updateSignalAura(data.node_id, node, radius, opacity, node.color || '#00ff41');
+            nodeReadings[data.node_id] = { rssi, strength, ts: Date.now() };
             updateTarget();
         }
 
-        function createSignalAura(node,radius,opacity) {
-            const color=node.color||'#00ff41';
-            const a=document.createElement('div');
-            a.className='signal-aura';
-            a.style.left=`${node.x*100}%`; a.style.top=`${node.y*100}%`;
-            a.style.width=`${2*radius*100}%`; a.style.height=`${2*radius*100}%`;
-            a.style.backgroundColor=hexToRgba(color,0.1);
-            a.style.border=`1px solid ${hexToRgba(color,0.4)}`;
-            gridContainer.appendChild(a);
-            setTimeout(()=>{ a.style.opacity=opacity; a.style.transform='translate(-50%,-50%) scale(1)'; },50);
-            setTimeout(()=>{ a.style.opacity='0'; a.style.transform='translate(-50%,-50%) scale(1.2)'; },1000);
-            setTimeout(()=>a.remove(),2600);
+        async function loadRuntimeState() {
+            const response = await fetch('/runtime/state', { cache: 'no-store' });
+            if (!response.ok) throw new Error(`runtime_state_${response.status}`);
+            const state = await response.json();
+
+            if (state.environment) {
+                officeWidthFt = state.environment.width_ft || officeWidthFt;
+                officeHeightFt = state.environment.height_ft || officeHeightFt;
+                officeCeilingFt = state.environment.ceiling_ft || officeCeilingFt;
+            }
+            if (state.nodes) nodeConfig = state.nodes;
+            if (state.ui_controls) {
+                controlState.frequencyHz = Number(state.ui_controls.frequency_hz || controlState.frequencyHz);
+                controlState.sensitivityPct = Number(state.ui_controls.sensitivity_pct || controlState.sensitivityPct);
+                controlState.perimeterFt = Number(state.ui_controls.perimeter_ft || controlState.perimeterFt);
+                controlState.accuracyPct = Number(state.ui_controls.accuracy_pct || controlState.accuracyPct);
+            }
         }
 
-        // ── WebSocket ─────────────────────────────────────────────────────────
+        async function persistControls() {
+            await fetch('/runtime/controls', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    frequency_hz: controlState.frequencyHz,
+                    sensitivity_pct: controlState.sensitivityPct,
+                    perimeter_ft: controlState.perimeterFt,
+                    accuracy_pct: controlState.accuracyPct,
+                    view_mode: currentView,
+                }),
+            });
+        }
+
         function connectWebSocket() {
-            const wsUrl=`ws://${window.location.hostname||'localhost'}:8765`;
-            document.getElementById('sp-ws').textContent=window.location.hostname||'localhost';
-            statusBar.textContent=`Connecting to ${wsUrl}...`;
-            statusBar.style.color='#ff4500';
-            const socket=new WebSocket(wsUrl);
-            socket.onopen=()=>{ statusBar.textContent='LIVE FEED — System armed.'; statusBar.style.color='#00ff41'; };
-            socket.onmessage=handleMotionEvent;
-            socket.onclose=()=>{ statusBar.textContent='Signal lost. Reconnecting...'; statusBar.style.color='#ff0000'; setTimeout(connectWebSocket,3000); };
-            socket.onerror=()=>socket.close();
+            const wsUrl = `ws://${window.location.hostname || 'localhost'}:8765`;
+            statusBar.textContent = `Connecting to ${wsUrl}...`;
+            spWs.textContent = window.location.hostname || 'localhost';
+            const socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                statusBar.textContent = 'LIVE FEED: Connection established.';
+                statusBar.style.color = '#00ff41';
+            };
+            socket.onmessage = handleMotionEvent;
+            socket.onclose = () => {
+                statusBar.textContent = 'Connection closed. Reconnecting in 3 seconds...';
+                statusBar.style.color = '#ff4040';
+                setTimeout(connectWebSocket, 3000);
+            };
+            socket.onerror = () => socket.close();
         }
 
-        // ── Init ──────────────────────────────────────────────────────────────
         async function initialize() {
             try {
-                const cfg=await (await fetch('config.json')).json();
-                officeWidthFt=cfg.environment.width_ft;
-                officeHeightFt=cfg.environment.height_ft;
-                nodeConfig=cfg.nodes;
-                if (!nodeConfig) throw new Error("'nodes' missing");
+                await loadRuntimeState();
+                gridContainer.style.aspectRatio = `${officeWidthFt} / ${officeHeightFt}`;
+                spRoom.textContent = `${officeWidthFt}×${officeHeightFt}×${officeCeilingFt} ft`;
 
-                document.getElementById('sp-room').textContent=
-                    `${officeWidthFt}×${officeHeightFt} ft`;
+                slFreq.value = String(controlState.frequencyHz);
+                slSens.value = String(controlState.sensitivityPct);
+                slOuter.value = String(controlState.perimeterFt);
+                slAcc.value = String(controlState.accuracyPct);
+                refreshControlLabels();
 
-                const ar=officeWidthFt/officeHeightFt;
-
-                // Compute grid size to fit view-area minus side panel
-                const va=document.getElementById('view-area');
-                const availW=va.clientWidth-20;
-                const availH=window.innerHeight-90;
-                const w=Math.min(availW, availH*ar);
-                const h=w/ar;
-                gridContainer.style.width=w+'px';
-                gridContainer.style.height=h+'px';
-                svgW=w; svgH=h;
-
-                // Polar SVG sizing
-                const pSize=Math.min(w,h)*1.05;
-                polarSvg.setAttribute('width',pSize);
-                polarSvg.setAttribute('height',pSize);
-
-                // SVG overlay
-                svgEl=mkEl('svg'); svgEl.id='target-overlay';
-                svgEl.setAttribute('viewBox',`0 0 ${svgW} ${svgH}`);
-                svgEl.setAttribute('preserveAspectRatio','none');
-                const defs=mkEl('defs');
-                defs.innerHTML='<filter id="laser-glow" x="-50%" y="-50%" width="200%" height="200%">'+
-                    '<feGaussianBlur stdDeviation="3" result="blur"/>'+
-                    '<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>'+
-                    '</filter>';
-                svgEl.appendChild(defs);
-
-                // Detection zones per node (inner + outer)
-                const mkZone=(nodeId,nodeInfo,ft,cls)=>{
-                    const z=mkEl('ellipse',{
-                        cx:nodeInfo.x*svgW, cy:nodeInfo.y*svgH,
-                        rx:(ft/officeWidthFt)*svgW, ry:(ft/officeHeightFt)*svgH,
-                        stroke:nodeInfo.color||'#00ff41',
-                        class:`detection-zone ${cls}-zone`
-                    });
-                    z.id=`zone-${cls}-${nodeId}`;
-                    svgEl.appendChild(z);
-                    const lbl=mkEl('text',{
-                        x:nodeInfo.x*svgW+(ft/officeWidthFt)*svgW+4,
-                        y:nodeInfo.y*svgH-4,
-                        fill:nodeInfo.color||'#00ff41',
-                        'font-size':'10','font-family':'Courier New',opacity:'0.4'
-                    });
-                    lbl.textContent=ft+' ft';
-                    svgEl.appendChild(lbl);
-                };
-
-                Object.entries(nodeConfig).forEach(([id,info])=>{
-                    mkZone(id,info,DETECT_FT,'inner');
-                    const outerEl=mkEl('ellipse',{
-                        cx:info.x*svgW, cy:info.y*svgH,
-                        rx:(OUTER_FT/officeWidthFt)*svgW, ry:(OUTER_FT/officeHeightFt)*svgH,
-                        stroke:info.color||'#ff8c00', 'stroke-dasharray':'3 7',
-                        fill:'none',opacity:'0.15','stroke-width':'1',
-                        class:'outer-zone'
-                    });
-                    outerEl.id=`zone-outer-${id}`;
-                    svgEl.appendChild(outerEl);
-                });
-
-                // Trail group
-                const tg=mkEl('g'); tg.id='trail-group';
-                svgEl.appendChild(tg);
+                svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svgEl.id = 'target-overlay';
+                svgEl.setAttribute('width', '100%');
+                svgEl.setAttribute('height', '100%');
                 gridContainer.appendChild(svgEl);
 
-                // Node labels + dots
-                Object.entries(nodeConfig).forEach(([nodeId,nodeInfo])=>{
-                    const color=nodeInfo.color||'#00ff41';
-                    const lbl=document.createElement('div');
-                    lbl.textContent=`ESP32-${nodeId}`;
-                    lbl.className='node-label';
-                    lbl.style.left=`${nodeInfo.x*100}%`;
-                    lbl.style.top=`${nodeInfo.y*100}%`;
-                    lbl.style.color=color;
-                    gridContainer.appendChild(lbl);
-                    const dot=document.createElement('div');
-                    dot.className='node-dot';
-                    dot.style.left=`${nodeInfo.x*100}%`;
-                    dot.style.top=`${nodeInfo.y*100}%`;
-                    dot.style.background=color;
-                    dot.style.color=color;
+                for (const [nodeId, nodeInfo] of Object.entries(nodeConfig || {})) {
+                    const label = document.createElement('div');
+                    label.className = 'node-label';
+                    label.textContent = `ESP32-${nodeId}`;
+                    label.style.left = `${nodeInfo.x * 100}%`;
+                    label.style.top = `${nodeInfo.y * 100}%`;
+                    label.style.color = nodeInfo.color || '#00ff41';
+                    gridContainer.appendChild(label);
+
+                    const dot = document.createElement('div');
+                    dot.className = 'node-dot';
+                    dot.style.left = `${nodeInfo.x * 100}%`;
+                    dot.style.top = `${nodeInfo.y * 100}%`;
+                    dot.style.backgroundColor = nodeInfo.color || '#00ff41';
+                    dot.style.color = nodeInfo.color || '#00ff41';
                     gridContainer.appendChild(dot);
+                }
+
+                btnTop.addEventListener('click', () => setView('top'));
+                btnFirst.addEventListener('click', () => setView('first'));
+                btnIso.addEventListener('click', () => setView('iso'));
+
+                captureButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        calibrationSnapshots[button.dataset.capture] = {
+                            x: parseFloat(spX.textContent) || 0,
+                            y: parseFloat(spY.textContent) || 0,
+                            a: spDA.textContent === '—' ? null : parseFloat(spDA.textContent),
+                            b: spDB.textContent === '—' ? null : parseFloat(spDB.textContent),
+                            time: new Date().toLocaleTimeString(),
+                        };
+                        renderCalibrationReadout();
+                    });
                 });
 
-                updatePerimBar();
+                slFreq.addEventListener('input', (event) => {
+                    controlState.frequencyHz = Number(event.target.value);
+                    refreshControlLabels();
+                    scheduleControlSave();
+                });
+                slSens.addEventListener('input', (event) => {
+                    controlState.sensitivityPct = Number(event.target.value);
+                    refreshControlLabels();
+                    scheduleControlSave();
+                });
+                slOuter.addEventListener('input', (event) => {
+                    controlState.perimeterFt = Number(event.target.value);
+                    refreshControlLabels();
+                    scheduleControlSave();
+                });
+                slAcc.addEventListener('input', (event) => {
+                    controlState.accuracyPct = Number(event.target.value);
+                    refreshControlLabels();
+                    scheduleControlSave();
+                });
+
+                renderCalibrationReadout();
+                setView('top');
                 connectWebSocket();
-            } catch(e) {
-                statusBar.textContent=`Init failed: ${e.message}`;
-                statusBar.style.color='#ff0000';
+                setInterval(updateTarget, 500);
+                setInterval(fadeStaleSignalAuras, 250);
+            } catch (error) {
+                statusBar.textContent = `Initialization failed: ${error.message}`;
+                statusBar.style.color = '#ff4040';
             }
         }
 
