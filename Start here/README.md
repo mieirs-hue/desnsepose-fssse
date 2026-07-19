@@ -1,34 +1,40 @@
-# Sentry Matrix (RF-Only)
+# Sentry Matrix (Terminal Truth Mode)
+
+This mode removes the browser dashboard and prints raw proximity state directly to the terminal.
+
+## Output States
+- `NEAR_A`: Node A RSSI is stronger than Node B and above `-60 dBm`.
+- `NEAR_B`: Node B RSSI is stronger than Node A and above `-60 dBm`.
+- `MID`: all other conditions.
 
 ## Files
-- `sentry_daemon.py`: Reads RSSI from /dev/ttyACM0 and /dev/ttyACM1 on Linux (or COM5/COM10 on Windows) and broadcasts telemetry on `ws://127.0.0.1:8765`.
-- `index.html`: 3D isometric dashboard for live tracking visualization.
-- `requirements.txt`: Python dependencies.
-
-## Anchor Orientation (Required)
-- Mount both ESP32-S3 boards vertically.
-- USB-C connector points downward (same orientation on A and B).
-- Do not rotate one board relative to the other after calibration.
+- `sentry_daemon.py`: Reads RSSI from both ESP32-S3 nodes and prints state changes.
+- `requirements.txt`: Python dependency list (`pyserial`).
 
 ## Setup
-1. Open a terminal in this folder.
-2. Install packages:
+1. Open terminal in this folder.
+2. Install dependencies:
 
-```powershell
-pip install -r requirements.txt
+```bash
+./.venv/bin/python -m pip install -r requirements.txt
 ```
 
-3. Start the telemetry daemon:
+3. Run daemon:
 
-```powershell
-python sentry_daemon.py
+```bash
+./.venv/bin/python sentry_daemon.py
 ```
 
-4. Open `index.html` in a browser.
+## Ports
+- Linux defaults: `/dev/ttyACM0` and `/dev/ttyACM1`
+- Windows defaults: `COM5` and `COM10`
 
-## Data Format Expected from ESP32-S3 Nodes
-The daemon looks for lines containing `rssi` and parses the first number. Example accepted lines:
-- `RSSI: -67`
-- `node_a_rssi=-72.4 dBm`
+Override with environment variables:
+- `SENTRY_PORT_A`
+- `SENTRY_PORT_B`
 
-If a node is offline, the daemon automatically switches that node to simulation mode so the UI stays active.
+Example:
+
+```bash
+SENTRY_PORT_A=/dev/ttyACM1 SENTRY_PORT_B=/dev/ttyACM0 ./.venv/bin/python sentry_daemon.py
+```

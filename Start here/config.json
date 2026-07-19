@@ -1,0 +1,22 @@
+{
+  "environment": {
+    "width_ft": 20,
+    "height_ft": 15
+  },
+  "sensitivity": {
+    "rssi_threshold_near": -60,
+    "rssi_threshold_mid": -80
+  },
+  "nodes": {
+    "A": {
+      "x": 0.95,
+      "y": 0.95,
+      "color": "#00FFFF"
+    },
+    "B": {
+      "x": 0.05,
+      "y": 0.05,
+      "color": "#FFFF00"
+    }
+  }
+}
