@@ -26,6 +26,12 @@ BAUD_RATE = 115200
 WS_HOST = "127.0.0.1"
 WS_PORT = 8765
 
+ROOM_WIDTH = 20.0
+ROOM_DEPTH = 10.0
+ROOM_HEIGHT = 9.0
+NODE_A_POS = (ROOM_WIDTH, ROOM_DEPTH)
+NODE_B_POS = (0.0, 0.0)
+
 # Hardware assumption: both ESP32-S3 anchors are mounted vertically,
 # with USB-C connectors facing downward.
 
@@ -34,6 +40,9 @@ WS_PORT = 8765
 class SignalState:
     signal_a: float = -80.0
     signal_b: float = -80.0
+    last_x: float = 10.0
+    last_y: float = 5.0
+    last_z: float = 4.5
 
     def set_signal(self, node_id: str, value: float) -> None:
         if node_id == "A":
@@ -41,24 +50,65 @@ class SignalState:
         elif node_id == "B":
             self.signal_b = value
 
+    @staticmethod
+    def _rssi_to_distance(dbm: float) -> float:
+        # Calibrated to ~15ft practical overlap while still spanning room extremes.
+        tx_power_at_1m = -50.0
+        path_loss = 2.0
+        distance = math.pow(10.0, (tx_power_at_1m - dbm) / (10.0 * path_loss))
+        return max(0.6, min(25.0, distance))
+
     def calculate_spatial_vector(self) -> dict:
-        # Office volume model: 20ft x 10ft x 9ft (single story).
+        r_a = self._rssi_to_distance(self.signal_a)
+        r_b = self._rssi_to_distance(self.signal_b)
+
+        x1, y1 = NODE_A_POS
+        x2, y2 = NODE_B_POS
+        d = math.hypot(x2 - x1, y2 - y1)
+
+        a = (r_a * r_a - r_b * r_b + d * d) / (2.0 * d)
+        a = max(0.0, min(d, a))
+        h_sq = max(0.0, r_a * r_a - a * a)
+        h = math.sqrt(h_sq)
+
+        px = x1 + a * (x2 - x1) / d
+        py = y1 + a * (y2 - y1) / d
+
+        rx = -(y2 - y1) * (h / d)
+        ry = (x2 - x1) * (h / d)
+
+        candidates = [(px + rx, py + ry), (px - rx, py - ry)]
+
+        def candidate_score(candidate: tuple[float, float]) -> float:
+            cx, cy = candidate
+            continuity = math.hypot(cx - self.last_x, cy - self.last_y)
+            out_penalty = 0.0
+            if cx < 0.0 or cx > ROOM_WIDTH:
+                out_penalty += 20.0
+            if cy < 0.0 or cy > ROOM_DEPTH:
+                out_penalty += 20.0
+            return continuity + out_penalty
+
+        best_x, best_y = min(candidates, key=candidate_score)
+        best_x = max(0.0, min(ROOM_WIDTH, best_x))
+        best_y = max(0.0, min(ROOM_DEPTH, best_y))
+
         norm_a = max(0.0, min(1.0, (self.signal_a + 100.0) / 60.0))
         norm_b = max(0.0, min(1.0, (self.signal_b + 100.0) / 60.0))
-
-        # Differential model: avoid periodic trajectories from trig-based mapping.
-        # balance < 0 means stronger B, balance > 0 means stronger A.
-        balance = norm_a - norm_b
         strength = (norm_a + norm_b) * 0.5
+        z = 1.2 + strength * 6.5
+        z = max(0.0, min(ROOM_HEIGHT, z))
 
-        x = 10.0 + balance * 9.0
-        y = 5.0 + (strength - 0.5) * 4.0 + balance * 1.2
-        z = 1.5 + strength * 6.0
+        # Light temporal smoothing to remove jumpiness while preserving motion.
+        alpha = 0.38
+        self.last_x += (best_x - self.last_x) * alpha
+        self.last_y += (best_y - self.last_y) * alpha
+        self.last_z += (z - self.last_z) * alpha
 
         return {
-            "x": round(max(0.0, min(20.0, x)), 2),
-            "y": round(max(0.0, min(10.0, y)), 2),
-            "z": round(max(0.0, min(9.0, z)), 2),
+            "x": round(self.last_x, 2),
+            "y": round(self.last_y, 2),
+            "z": round(self.last_z, 2),
         }
 
 
@@ -67,25 +117,22 @@ state = SignalState()
 
 def parse_rssi(line: str) -> float | None:
     lowered = line.lower()
-    if "rssi" not in lowered:
-        return None
-
-    # Prefer values explicitly tied to RSSI labels.
-    labeled = re.search(r"rssi\s*[:=]\s*(-?\d+(?:\.\d+)?)", lowered)
+    # Prefer values explicitly tied to RSSI/dBm labels, but tolerate bare numeric lines too.
+    labeled = re.search(r"(?:rssi|dbm|signal)\s*[:=]\s*(-?\d+(?:\.\d+)?)", lowered)
     if labeled:
         try:
             value = float(labeled.group(1))
-            if -120.0 <= value <= 20.0:
+            if -120.0 <= value <= -1.0:
                 return value
         except ValueError:
             return None
 
-    # Fallback: first realistic dBm-like negative number in the line.
-    match = re.search(r"(-\d+(?:\.\d+)?)", lowered)
+    # Fallback: first realistic signed number in the line.
+    match = re.search(r"(-?\d+(?:\.\d+)?)", lowered)
     if match:
         try:
             value = float(match.group(1))
-            if -120.0 <= value <= -20.0:
+            if -120.0 <= value <= -1.0:
                 return value
         except ValueError:
             return None
