@@ -2,29 +2,83 @@
   "environment": {
     "width_ft": 20,
     "height_ft": 10,
-    "ceiling_ft": 10
+    "depth_ft": 10,
+    "ceiling_ft": 10,
+    "ceiling_thickness_ft": 3
   },
   "sensitivity": {
-    "rssi_threshold_near": -72,
-    "rssi_threshold_mid": -87
+    "rssi_threshold_near": -56,
+    "rssi_threshold_mid": -72
   },
   "nodes": {
-    "A": {
-      "x": 0.95,
-      "y": 0.95,
-      "color": "#00FFFF"
+    "NORTH": {
+      "label": "North",
+      "x": 0.0,
+      "y": 5.0,
+      "z": 9.0,
+      "color": "#00FFFF",
+      "aliases": [
+        "A"
+      ]
     },
-    "B": {
-      "x": 0.05,
-      "y": 0.05,
-      "color": "#FFFF00"
+    "SOUTH": {
+      "label": "South",
+      "x": 0.0,
+      "y": -5.0,
+      "z": 9.0,
+      "color": "#FFFF00",
+      "aliases": [
+        "B"
+      ]
+    },
+    "EAST": {
+      "label": "East",
+      "x": 10.0,
+      "y": 0.0,
+      "z": 9.0,
+      "color": "#00FF66",
+      "aliases": [
+        "C"
+      ]
+    },
+    "WEST": {
+      "label": "West",
+      "x": -10.0,
+      "y": 0.0,
+      "z": 9.0,
+      "color": "#FF6600",
+      "aliases": [
+        "D"
+      ]
     }
   },
+  "node_aliases": {
+    "A": "NORTH",
+    "B": "SOUTH",
+    "C": "EAST",
+    "D": "WEST",
+    "NODE_A": "NORTH",
+    "NODE_B": "SOUTH",
+    "NODE_C": "EAST",
+    "NODE_D": "WEST"
+  },
+  "mac_mappings": {},
   "ui_controls": {
-    "frequency_hz": 4,
-    "sensitivity_pct": 24,
-    "perimeter_ft": 11,
-    "accuracy_pct": 30,
-    "view_mode": "topside"
+    "frequency_hz": 20,
+    "sensitivity_pct": 100,
+    "perimeter_ft": 20,
+    "accuracy_pct": 13,
+    "board_b_boost_db": 5,
+    "motion_scale_pct": 220,
+    "motion_deadband_ft": 0.1,
+    "view_mode": "topside",
+    "board_a_boost_db": -2
+  },
+  "baseline": {
+    "rssi_a": -41,
+    "rssi_b": -55,
+    "estimate_a": 5.287946840830008,
+    "estimate_b": 7.571900202914848,
+    "timestamp": 1784562958.8952959
   }
 }

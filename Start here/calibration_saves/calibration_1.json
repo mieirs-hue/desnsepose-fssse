@@ -1,0 +1,43 @@
+{
+  "name": "Calibration 1",
+  "captured_at_utc": "2026-07-20T05:09:36.737Z",
+  "room": {
+    "width_ft": 20,
+    "height_ft": 10,
+    "ceiling_ft": 10
+  },
+  "controls": {
+    "frequency_hz": 10,
+    "sensitivity_pct": 42,
+    "perimeter_ft": 20,
+    "accuracy_pct": 72,
+    "board_b_boost_db": 0,
+    "motion_scale_pct": 140,
+    "motion_deadband_ft": 0.9
+  },
+  "baseline": {
+    "rssi_a_dbm": -42,
+    "rssi_b_dbm": -58,
+    "estimate_a_ft": 0.3,
+    "estimate_b_ft": 0.3,
+    "delta_a_dbm": 0,
+    "delta_b_dbm": 4
+  },
+  "telemetry": {
+    "position_x_ft": 10.8,
+    "position_y_ft": 5.4,
+    "signal_estimate_a_ft": 0.3,
+    "signal_estimate_b_ft": 0.3,
+    "rssi_a_dbm": -42,
+    "rssi_b_dbm": -54,
+    "mode": "DUAL-TRACK",
+    "confidence_pct": 38,
+    "motion": "HOLDING"
+  },
+  "calibration_points": {
+    "front_left": null,
+    "center": null,
+    "back_right": null
+  },
+  "notes": "Saved from live dashboard snapshot after repeated baseline captures."
+}
